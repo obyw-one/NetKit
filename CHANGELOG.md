@@ -5,6 +5,38 @@ All notable changes to NetKit are documented here. This project follows
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-10-28
+
+### Added
+
+- **`UmamiEndPoint.track(name:)`** — an optional top-level `name`, emitted only
+  when set. This is the key that promotes a `/api/send` row from a PAGEVIEW to
+  a named CUSTOM EVENT, and it is what umami's Events view groups by. Until
+  now there was no parameter to emit it: `body` wrote `title` and `url` and
+  nothing else that could carry an event name.
+
+  That shape is right for a mobile app — a screen IS a page — and wrong for a
+  CLI, where the verb is the event and every invocation otherwise lands as an
+  unnamed pageview no funnel can group.
+
+  Measured against a live umami, 2026-10-28, the same payload twice one key
+  apart: with `"name"` it is accepted and appears under Events; without, the
+  same answer and the same session, and it stays a pageview. So `name` is a
+  documented top-level key and does NOT provoke the HTTP 500 that `os` and
+  `browser` do there — which is why those two keep their regression comments
+  in `body` and this one needs none.
+
+  Additive and non-breaking: every pre-2.3.0 caller is byte-identical.
+  `T-NAME-02` asserts the key is absent by default, because emitting an empty
+  name would silently reclassify every existing screen view as a custom event.
+  `T-NAME-03` asserts adding a name adds exactly one key and removes none.
+
+  Found by shikki spec `9e1c4a77` W3 (shikki-io/shikki#1864), which could name
+  its own events and then had nowhere to put the name on the wire. The gap had
+  been there since v1.0.0 — zero occurrences of a top-level `name` in any tag
+  `v1.0.0..v2.2.1`. Reported upstream rather than forked or vendored.
+
+
 ### Added
 
 - **Umami primitive** (`Sources/NetworkKit/Umami/`): upstreamed the umami wire
