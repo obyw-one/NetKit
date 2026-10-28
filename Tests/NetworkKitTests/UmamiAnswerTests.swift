@@ -100,3 +100,75 @@ struct UmamiAnswerTests {
         #expect(answer.sessionId == nil, "the event was accepted; the body was simply thin")
     }
 }
+
+// MARK: - Acceptance (2.4.0)
+//
+// A 2xx means the REQUEST arrived. It does not mean the EVENT was recorded:
+// umami answers HTTP 200 with `{"beep":"boop"}` when its bot filter discards
+// one. Before 2.4.0 that body decoded to the same all-nil `UmamiAnswer` as an
+// acceptance, so no consumer could tell them apart — and this type's own
+// header said every thin body meant ACCEPTED, which is how shikki came to ack
+// a rejection and delete a telemetry buffer (shikki#1862, reversed in #1864).
+//
+// Extracted here, rather than kept in shikki, because what a body MEANS is the
+// wire contract and is identical for every consumer. What to DO about it stays
+// the consumer's policy.
+
+@Suite("UmamiAnswer — a 200 is not a delivery")
+struct UmamiAnswerAcceptanceTests {
+
+  private func decode(_ json: String) throws -> UmamiAnswer {
+    try JSONDecoder().decode(UmamiAnswer.self, from: Data(json.utf8))
+  }
+
+  @Test("T-ACC-01: the bot-rejection body is REJECTED, not accepted")
+  func botRejectionIsRejected() throws {
+    let answer = try decode(#"{"beep":"boop"}"#)
+    #expect(answer.beep == "boop")
+    #expect(answer.acceptance == .botRejected)
+  }
+
+  @Test("T-ACC-02: an answer carrying any attribution is ACCEPTED")
+  func attributionIsAccepted() throws {
+    #expect(try decode(#"{"cache":"x"}"#).acceptance == .accepted)
+    #expect(try decode(#"{"sessionId":"s"}"#).acceptance == .accepted)
+    #expect(try decode(#"{"visitId":"v"}"#).acceptance == .accepted)
+    #expect(try decode(#"{"cache":"x","sessionId":"s","visitId":"v"}"#).acceptance == .accepted)
+  }
+
+  @Test("T-ACC-03: an empty object is UNRECOGNISED — unknown, not denied")
+  func emptyIsUnrecognised() throws {
+    #expect(try decode("{}").acceptance == .unrecognised)
+  }
+
+  @Test("T-ACC-04: the two bodies that used to be identical are now distinguishable")
+  func rejectionAndEmptyNoLongerCollide() throws {
+    // THE REGRESSION. Before 2.4.0 both decoded to all-nil and compared EQUAL,
+    // so a consumer had no information to act on, whatever its policy.
+    let rejected = try decode(#"{"beep":"boop"}"#)
+    let empty = try decode("{}")
+    #expect(rejected != empty)
+    #expect(rejected.acceptance != empty.acceptance)
+  }
+
+  @Test("T-ACC-05: a rejection marker wins over attribution, if umami ever sends both")
+  func rejectionWinsOverAttribution() throws {
+    let answer = try decode(#"{"cache":"x","beep":"boop"}"#)
+    #expect(answer.acceptance == .botRejected,
+            "a discard must never read as delivered because another key happened to be present")
+  }
+
+  @Test("T-ACC-06: beep is absent on every acceptance shape — no false rejections")
+  func acceptanceShapesCarryNoBeep() throws {
+    for json in [#"{"cache":"x"}"#, #"{"sessionId":"s"}"#, "{}"] {
+      #expect(try decode(json).beep == nil)
+    }
+  }
+
+  @Test("T-ACC-07: pre-2.4.0 callers are unaffected — beep defaults to nil")
+  func additiveForExistingCallers() {
+    let answer = UmamiAnswer(cache: "x", sessionId: "s", visitId: "v")
+    #expect(answer.beep == nil)
+    #expect(answer.acceptance == .accepted)
+  }
+}
