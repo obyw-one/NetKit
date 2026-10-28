@@ -17,7 +17,7 @@ struct UmamiEndPointTests {
 
   private static let endpoint = URL(string: "https://umami.example")!
 
-  private static func makeConfig(
+  static func makeConfig(
     endpoint: URL = UmamiEndPointTests.endpoint,
     websiteId: String = "site-1",
     hostname: String = "com.example.app",
@@ -295,5 +295,84 @@ struct UmamiEndPointTests {
     // NSNumber/NSString / [String: Any] uniformly. Field-by-field NSDictionary
     // equality is the accepted way to compare JSON-serialised `[String: Any]`.
     #expect(NSDictionary(dictionary: parsed) == NSDictionary(dictionary: expectedParsed))
+  }
+}
+
+// MARK: - Top-level `name` (2.3.0)
+//
+// umami promotes a `/api/send` row from a PAGEVIEW to a named CUSTOM EVENT on
+// the top-level `name` key — it is what the dashboard's Events view groups by.
+// NetKit had no parameter to emit it: `title` and `url` are the right shape for
+// a mobile screen (a screen IS a page) but wrong for a CLI, where the verb is
+// the event and every invocation otherwise lands as an unnamed pageview that no
+// funnel can group.
+//
+// Found 2026-10-28 by shikki's W3 (spec 9e1c4a77), which could name events in
+// its own payload and then had nowhere to put the name on the wire. The gap had
+// been there since v1.0.0 — zero occurrences of a top-level `name` in any tag.
+
+@Suite("UmamiEndPoint — the event name that makes a custom event")
+struct UmamiEndPointNameTests {
+
+  private static func payload(_ endpoint: UmamiEndPoint) throws -> [String: Any] {
+    let body = try #require(endpoint.body)
+    return try #require(body["payload"] as? [String: Any])
+  }
+
+  @Test("T-NAME-01: a name is emitted at the TOP LEVEL, where umami reads it")
+  func nameIsTopLevel() throws {
+    let endpoint = UmamiEndPoint.track(
+      config: try UmamiEndPointTests.makeConfig(),
+      url: "/cli/doctor",
+      title: "shikki.verb.exit",
+      name: "shikki.verb.exit"
+    )
+    let payload = try Self.payload(endpoint)
+    #expect(payload["name"] as? String == "shikki.verb.exit")
+    // NOT inside `data`: a name nested there stays a pageview.
+    let data = try #require(payload["data"] as? [String: String])
+    #expect(data["name"] == nil)
+  }
+
+  @Test("T-NAME-02: absent by default — every pre-2.3.0 caller stays a pageview")
+  func absentByDefault() throws {
+    let endpoint = UmamiEndPoint.track(
+      config: try UmamiEndPointTests.makeConfig(),
+      url: "/home",
+      title: "Home"
+    )
+    let payload = try Self.payload(endpoint)
+    #expect(payload["name"] == nil, "emitting an empty name would reclassify every existing screen view")
+    #expect(payload["title"] as? String == "Home")
+    #expect(payload["url"] as? String == "/home")
+  }
+
+  @Test("T-NAME-03: a name does not disturb the fields a pageview already carried")
+  func nameIsAdditive() throws {
+    let config = try UmamiEndPointTests.makeConfig()
+    let without = try Self.payload(
+      .track(config: config, url: "/cli", title: "t"))
+    let with = try Self.payload(
+      .track(config: config, url: "/cli", title: "t", name: "shikki.verb.doctor"))
+
+    for key in without.keys {
+      #expect(with[key] != nil, "`\(key)` disappeared when a name was supplied")
+    }
+    #expect(Set(with.keys).subtracting(without.keys) == ["name"],
+            "adding a name must add exactly one key")
+  }
+
+  @Test("T-NAME-04: name and title are independent — a CLI sets both, differently")
+  func nameAndTitleAreIndependent() throws {
+    let endpoint = UmamiEndPoint.track(
+      config: try UmamiEndPointTests.makeConfig(),
+      url: "/cli/flow/start",
+      title: "flow start",
+      name: "shikki.verb.exit"
+    )
+    let payload = try Self.payload(endpoint)
+    #expect(payload["name"] as? String == "shikki.verb.exit")
+    #expect(payload["title"] as? String == "flow start")
+    #expect(payload["url"] as? String == "/cli/flow/start")
   }
 }
