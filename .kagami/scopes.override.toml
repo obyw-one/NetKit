@@ -1,0 +1,23 @@
+# kagami scopes for NetKit — the one way to run this package's tests
+# (never `swift test` from an agent, per [[kagami-only-never-swift-test]]).
+#
+# Hand-authored, and that is the point. Until 2026-10-29 this package tracked
+# only `.kagami/scopes.toml`, which carries
+# `generated_by = "kagami auto-discover --write-cache"` — a DERIVED cache, not
+# a source. Tracking a generated file as config means the declared gate churns
+# whenever discovery re-runs, and nobody owns the floor. The cache is now
+# ignored and regenerates itself; this file is the source.
+#
+# Arrays stay on ONE line each: kagami's TOML reader rejects multi-line arrays.
+
+[[scopes]]
+name = "NetKitTests"
+language = "swift"
+package_path = "."
+test_target_name = "NetKitTests"
+module_patterns = ["NetKitTests"]
+type_patterns = ["ContentDirectoryTests", "DIDLLiteTests", "DIDLParsingTests", "DLNATests", "DeviceDescriptionTests", "EndPointTests", "MediaItemTests", "MockNetworkServiceTests", "NetworkServiceTests", "SOAPTests", "SSDPParsingTests", "SSDPSearchResponderTests", "SSDPSerializationTests", "SidecarMetadataTests", "UmamiAnswerTests", "UmamiAnswerAcceptanceTests", "UmamiEndPointTests", "UmamiEndPointNameTests", "UmamiTrackUseCaseTests"]
+test_file_patterns = ["**/NetworkKitTests/DLNATests.swift", "**/NetworkKitTests/EndPointTests.swift", "**/NetworkKitTests/MockNetworkServiceTests.swift", "**/NetworkKitTests/NetworkServiceTests.swift", "**/NetworkKitTests/UmamiAnswerTests.swift", "**/NetworkKitTests/UmamiEndPointTests.swift", "**/NetworkKitTests/UmamiTrackUseCaseTests.swift"]
+expected_test_min = 96
+timeout_seconds = 600
+description = "NetKit — the umami wire contract (config validation, endpoint body, UmamiAnswer acceptance) plus DLNA/SSDP and the NetworkService seam."

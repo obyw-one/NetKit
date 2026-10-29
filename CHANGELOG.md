@@ -5,6 +5,45 @@ All notable changes to NetKit are documented here. This project follows
 
 ## [Unreleased]
 
+## [2.4.0] — 2026-10-28
+
+### Added
+
+- **`UmamiAnswer.beep` and `UmamiAnswer.acceptance`** — a 2xx is not a
+  delivery.
+
+  umami answers HTTP **200** with `{"beep":"boop"}` when its bot filter
+  DISCARDS an event. Before this release that body decoded to the same all-nil
+  `UmamiAnswer` as a genuine acceptance, so **no consumer could tell them
+  apart** — the information was destroyed at decode, and no amount of
+  consumer-side policy could recover it.
+
+  `acceptance` returns `.accepted` / `.botRejected` / `.unrecognised`.
+  Rejection is checked first, so a discard can never read as delivered because
+  some other key happened to be present.
+
+### Fixed
+
+- **The v2.2.1 header was wrong, and it was the most expensive sentence in the
+  file.** It said `/api/send` answering with a bare token, `{}` or an empty
+  body meant "every one of those … the event was ACCEPTED". A consumer
+  following this type's own documentation would ack a bot-rejection and delete
+  the payload. That is exactly what shikki did (shikki#1862), losing a
+  telemetry buffer before the cause was found on 2026-10-28.
+
+### Notes
+
+- **Additive and non-breaking.** `beep` defaults to `nil`, so every pre-2.4.0
+  caller compiles unchanged and classifies as it did. `T-ACC-07` pins that.
+- Extracted from shikki#1864 at the operator's direction: what a body MEANS is
+  the wire contract and is identical for every consumer, so it belongs here —
+  WabiSabi uses this primitive too. What to DO about it (ack a journal, keep a
+  payload) stays the consumer's policy, which this type's header has always
+  reserved correctly.
+- Measured against a live umami on 2026-10-28, six User-Agent variants: every
+  one lacking an OS token came back `{"beep":"boop"}` with HTTP 200.
+
+
 ## [2.3.0] — 2026-10-28
 
 ### Added
