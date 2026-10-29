@@ -29,6 +29,3 @@ build/
 # The hand-authored `scopes.override.toml` is the source of truth.
 .kagami/*
 !.kagami/scopes.override.toml
-
-# A library must not pin its consumers' resolution graph.
-Package.resolved
