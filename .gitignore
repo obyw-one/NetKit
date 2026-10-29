@@ -14,3 +14,21 @@ build/
 !.env.dist
 !*.env.example
 !*.env.template
+
+# kagami (shi-qa) — the scope registry is SOURCE, everything else is scratch.
+#
+# An ALLOWLIST, deliberately, copied from ShellKit. A denylist cannot keep up:
+# CoreKit lists history.db/-shm/-wal/.write-lock/tmp and still misses
+# `.kagami/runs/`, which is exactly how this repo came to track 26 kagami
+# artifacts — five `runs/<id>/status.json` plus twenty sqlite shards whose
+# FILENAMES carry the machine name (`shard-<host>-<run-id>.sqlite`). Those are
+# per-run local state and a hostname leak, not source.
+#
+# `scopes.toml` is NOT allowlisted: it carries
+# `generated_by = "kagami auto-discover --write-cache"` and regenerates itself.
+# The hand-authored `scopes.override.toml` is the source of truth.
+.kagami/*
+!.kagami/scopes.override.toml
+
+# A library must not pin its consumers' resolution graph.
+Package.resolved
