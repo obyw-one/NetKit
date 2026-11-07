@@ -84,19 +84,37 @@ struct PocketJSONNode: Decodable {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() {
             value = .null
-        } else if let bool = try? container.decode(Bool.self) {
+        } else if let bool = Self.probe(Bool.self, in: container) {
             value = .bool(bool)
-        } else if let integer = try? container.decode(Int64.self) {
+        } else if let integer = Self.probe(Int64.self, in: container) {
             value = .integer(integer)
-        } else if let double = try? container.decode(Double.self) {
+        } else if let double = Self.probe(Double.self, in: container) {
             value = .double(double)
-        } else if let string = try? container.decode(String.self) {
+        } else if let string = Self.probe(String.self, in: container) {
             value = .string(string)
-        } else if let array = try? container.decode([PocketJSONNode].self) {
+        } else if let array = Self.probe([PocketJSONNode].self, in: container) {
             value = .array(array.map(\.value))
         } else {
+            // The last shape: if this is not an object either, the decoder's own error escapes.
             let object = try container.decode([String: PocketJSONNode].self)
             value = .object(object.mapValues(\.value))
+        }
+    }
+
+    /// Try one JSON shape; `nil` means "the value is not this shape".
+    ///
+    /// ANY error from a probe means that, not only `DecodingError`: measured on
+    /// Apple's Foundation, decoding `1.5` as `Int64` inside a `Decodable` throws
+    /// an internal JSON error (which only becomes a `DecodingError` at the outer
+    /// `decode` call), so a narrower catch lets a perfectly good fraction
+    /// escape. Nothing is hidden by this: when NO shape matches, the final
+    /// `container.decode([String: PocketJSONNode].self)` throws the decoder's
+    /// own error to the caller.
+    private static func probe<Shape: Decodable>(_ shape: Shape.Type, in container: any SingleValueDecodingContainer) -> Shape? {
+        do {
+            return try container.decode(shape)
+        } catch {
+            return nil
         }
     }
 }
