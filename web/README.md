@@ -1,6 +1,6 @@
 # @fj-studios/netkit-web
 
-TypeScript HTTP and WebSocket networking — the TS sibling of [FJ-Studios/NetKit](../README.md) (Swift).
+TypeScript HTTP and WebSocket networking — the TS sibling of [obyw-one/NetKit](../README.md) (Swift).
 
 Mirrors the Swift `NetworkKit` surface symbol-for-symbol:
 

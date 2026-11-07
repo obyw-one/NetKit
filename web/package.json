@@ -1,7 +1,7 @@
 {
   "name": "@fj-studios/netkit-web",
   "version": "0.1.0",
-  "description": "TypeScript HTTP and WebSocket networking — TS sibling of FJ-Studios/NetKit (Swift)",
+  "description": "TypeScript HTTP and WebSocket networking — TS sibling of obyw-one/NetKit (Swift)",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
