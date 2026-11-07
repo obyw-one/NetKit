@@ -14,6 +14,9 @@
 
 import CoreKit
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public enum PocketEndPoint: EndPoint {
 

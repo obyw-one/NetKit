@@ -57,8 +57,11 @@ All notable changes to NetKit are documented here. This project follows
 ### Notes
 
 - NetKit does not build on Linux: `import Network` (DLNA, `NetworkMonitor`) and
-  `Combine` (`NetworkProtocol`) are Apple-only. Unchanged by this release; the
-  new PocketBase files import neither.
+  `Combine` (`NetworkProtocol`) are Apple-only. Unchanged by this release. The
+  new PocketBase files import neither and carry the conditional
+  `FoundationNetworking` import; compiled in isolation on Linux (Swift 6.3) they
+  build cleanly and their 112 offline tests pass. `EndPoint.swift`, which they
+  conform to, still lacks that import and was left alone.
 
 - **`URLSessionS3Transport`** — the `URLSession` transport for CoreKit's
   `S3ObjectStoreClient`, moved here from CoreKit (spec d3f8a1b2). CoreKit keeps
