@@ -34,3 +34,14 @@ expected_test_min = 128
 timeout_seconds = 600
 description = "NetKit PocketBase client, offline: config validation, the wire contract of every PocketEndPoint case, every call and every error path, the unset-date reader and parity with the legacy app-level endpoints. Stubbed transport only (MockPocketTransport) — nothing here touches a network."
 
+[[scopes]]
+name = "NetKitPocketLiveTests"
+language = "swift"
+package_path = "."
+test_target_name = "NetKitTests"
+module_patterns = ["NetKitTests"]
+type_patterns = ["PocketLiveTests"]
+test_file_patterns = ["**/NetworkKitTests/PocketLive/*.swift"]
+expected_test_min = 18
+timeout_seconds = 900
+description = "NetKit PocketClient against a REAL throwaway PocketBase (podman). Run it as `scripts/pocketbase-live.sh -- kagami test --scope NetKitPocketLiveTests --strict`. Without the script the tests FAIL by design (they never skip: kagami counts skipped rows toward the floor and exits 0 on an all-skipped scope)."
