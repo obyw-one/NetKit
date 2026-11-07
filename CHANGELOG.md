@@ -7,6 +7,59 @@ All notable changes to NetKit are documented here. This project follows
 
 ### Added
 
+- **`PocketEndPoint` and `PocketClient` — a generic PocketBase client, beside
+  `UmamiEndPoint`.** Records (list with filter / sort / expand / fields /
+  `skipTotal`, view, create, update, delete), password login, token refresh,
+  password reset (request + confirm) and custom routes, over an injected
+  `PocketConfig` and `PocketTransport`.
+
+  - **No default URL.** `PocketConfig` is validated at construction; a missing
+    endpoint is `PocketConfigError.missingEndpoint`, never a fallback. It is not
+    `Codable` (it can hold a credential) and redacts it from its descriptions.
+  - **One typed error, with the server's own body.** `PocketError` keeps
+    PocketBase's `{status, message, data}` error body and the raw bytes.
+    `NetworkProtocol.sendRequest` cannot do this: it throws on a non-2xx status
+    before returning the body. 401/403, and a 400 from a login or refresh, are
+    `.authentication`. Nothing is swallowed.
+  - **Typed models only.** `PocketListContainer`, `PocketAuthResponse`,
+    `PocketErrorBody`, `PocketPayload` (over `CoreKit.JSONValue`),
+    `PocketQuery`. PocketBase dates go through the fleet strategy.
+  - **`PocketFilter.literal(_:)`** for a safe filter value. Interpolating a raw
+    value is a filter injection (measured: `x' || title != '` matches every
+    record). A backslash is refused: PocketBase 0.25.9 and 0.40.6 disagree on
+    what it means.
+  - **`decodePocketDateIfPresent(forKey:)`.** PocketBase serialises an unset
+    date as `""`, which the fleet date strategy rejects, so a plain `Date?`
+    fails the whole record.
+  - **`MockPocketTransport`**, a scripted actor for tests of anything built on
+    the client. A request with no queued reply fails loudly.
+  - `PocketEndPoint` is also an `EndPoint`, so a consumer that calls
+    `networkService.sendRequest(endpoint:)` keeps that call shape.
+
+  Requests are built without `NetworkProtocol.createRequest`'s hazards: path
+  segments and query values are percent-encoded, `..` and empty segments are
+  refused, bodies carry `Content-Type: application/json` (the shared builder
+  sends none, so URLSession labels the JSON `application/x-www-form-urlencoded`
+  and PocketBase answers "Cannot be blank"), and an update is a PATCH (PocketBase
+  has no PUT route for records: it answers 404).
+
+  Verified against a real PocketBase 0.25.9 and 0.40.6 started with podman:
+  `scripts/pocketbase-live.sh -- kagami test --scope NetKitPocketLiveTests --strict`.
+
+### Changed
+
+- **CoreKit is now `https://github.com/obyw-one/CoreKit.git` from `0.13.0`**
+  (was the `FJ-Studios` URL from `0.1.0`). Resolution moves swift-crypto to
+  4.5.2 and adds swift-log 1.17.0, both transitive through CoreKit. The one
+  caller of the deprecated `Data.prettyJson` (a debug log line) now uses
+  `prettyJSON()`.
+
+### Notes
+
+- NetKit does not build on Linux: `import Network` (DLNA, `NetworkMonitor`) and
+  `Combine` (`NetworkProtocol`) are Apple-only. Unchanged by this release; the
+  new PocketBase files import neither.
+
 - **`URLSessionS3Transport`** — the `URLSession` transport for CoreKit's
   `S3ObjectStoreClient`, moved here from CoreKit (spec d3f8a1b2). CoreKit keeps
   `S3Transport`, `AWSSignatureV4` and the request/response types and ships no
