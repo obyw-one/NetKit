@@ -46,8 +46,22 @@ All notable changes to NetKit are documented here. This project follows
   Verified against a real PocketBase 0.25.9 and 0.40.6 started with podman:
   `scripts/pocketbase-live.sh -- kagami test --scope NetKitPocketLiveTests --strict`.
 
+- **`PocketConfigEndpoint` — CoreKit's `ConfigEndpoint` over PocketBase.**
+  Fetches the server-driven `AppConfig` from a PocketBase collection (one
+  record per app and environment, filtered with `PocketFilter.literal`),
+  decoding `PocketListContainer<AppConfig>` from the snake_case record, throwing
+  `ConfigEndpointError.notFound` when there is none and every other failure
+  unchanged as a `PocketError`. The collection is injected; the bearer token is
+  asked for on each fetch, so a refreshed login is picked up. Runs CoreKit's
+  `ConfigEndpointConformance` over a fake server (offline) and over a real
+  PocketBase 0.25.9 (live scope), and drives CoreKit's `AppConfigService`.
+
 ### Changed
 
+- **CoreKit is pinned by REVISION `31925e5`** (the `epic/d3f8a1b2-resource-layer`
+  branch, which carries `ConfigEndpoint` and `ConfigEndpointConformance`) until
+  CoreKit tags a release; the test target gains the `CoreKitTestSupport`
+  product.
 - **CoreKit is now `https://github.com/obyw-one/CoreKit.git` from `0.13.0`**
   (was the `FJ-Studios` URL from `0.1.0`). Resolution moves swift-crypto to
   4.5.2 and adds swift-log 1.17.0, both transitive through CoreKit. The one

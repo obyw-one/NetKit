@@ -96,3 +96,10 @@ func decodeBody<Body: Decodable>(_ type: Body.Type, of request: URLRequest) thro
 func utf8Text(_ data: Data) throws -> String {
     try #require(String(bytes: data, encoding: .utf8), "the bytes are not UTF-8")
 }
+
+/// One query parameter of a captured request, percent-decoded.
+func queryValue(_ name: String, in request: URLRequest) throws -> String? {
+    let url = try #require(request.url)
+    let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+    return components.queryItems?.first { $0.name == name }?.value
+}

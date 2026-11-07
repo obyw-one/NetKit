@@ -185,6 +185,24 @@ struct CollectionSpec: Encodable {
         )
     }
 
+    /// A server-driven configuration collection: the snake_case fields `AppConfig` decodes, plus `env`.
+    static func appConfigs(name: String, listRule: String?) -> CollectionSpec {
+        CollectionSpec(
+            name: name, listRule: listRule, viewRule: listRule, createRule: nil, updateRule: nil, deleteRule: nil,
+            fields: [
+                Field(name: "app_id", type: "text", required: true),
+                Field(name: "env", type: "text", required: true),
+                Field(name: "min_version", type: "text", required: true),
+                Field(name: "latest_version", type: "text", required: true),
+                Field(name: "kill_switch", type: "bool"),
+                Field(name: "maintenance_mode", type: "bool"),
+                Field(name: "maintenance_message", type: "text"),
+                Field(name: "feature_flags", type: "json", required: true),
+                Field(name: "config_data", type: "json"),
+            ]
+        )
+    }
+
     static func authors(name: String) -> CollectionSpec {
         CollectionSpec(
             name: name, listRule: "", viewRule: "", createRule: "", updateRule: "", deleteRule: "",
