@@ -34,6 +34,8 @@ public enum PocketConfigError: Error, Equatable, Sendable, CustomStringConvertib
     case unexpectedComponents
     /// `authorization` was supplied but is empty or whitespace-only.
     case blankAuthorization
+    /// `authorization` holds a control character (a line break would split the header).
+    case invalidAuthorization
 
     public var description: String {
         switch self {
@@ -52,6 +54,8 @@ public enum PocketConfigError: Error, Equatable, Sendable, CustomStringConvertib
             return "PocketBase endpoint must be the server root (scheme, host, optional port): it has a path, query or fragment."
         case .blankAuthorization:
             return "PocketBase authorization is blank; pass nil for none."
+        case .invalidAuthorization:
+            return "PocketBase authorization contains a control character."
         }
     }
 }
@@ -112,8 +116,12 @@ public struct PocketConfig: Equatable, Sendable, CustomStringConvertible, Custom
             throw .unexpectedComponents
         }
 
-        if let authorization, authorization.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            throw .blankAuthorization
+        if let authorization {
+            guard !authorization.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw .blankAuthorization }
+            // A space is fine ("Bearer abc"); a control character is a header split.
+            guard authorization.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value != 0x7F }) else {
+                throw .invalidAuthorization
+            }
         }
         self.authorization = authorization
     }

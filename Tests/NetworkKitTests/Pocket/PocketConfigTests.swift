@@ -91,6 +91,13 @@ struct PocketConfigTests {
         }
     }
 
+    @Test("test_config_authorizationWithAControlCharacter_isRefused", arguments: ["Bearer abc\r\nX-Injected: 1", "abc\ndef", "tab\there", "nul\u{0}x"])
+    func test_config_authorizationWithAControlCharacter_isRefused(_ authorization: String) {
+        #expect(throws: PocketConfigError.invalidAuthorization) {
+            try PocketConfig(endpoint: URL(string: "https://pocket.example.test")!, authorization: authorization)
+        }
+    }
+
     // MARK: A missing config is a named error, never a fallback
 
     @Test("test_config_nilEndpoint_isMissingEndpoint")
@@ -144,7 +151,7 @@ struct PocketConfigTests {
     func test_config_errorDescriptions_neverEchoTheOffendingValue() {
         let withPath = PocketConfigError.unexpectedComponents.description
         #expect(!withPath.contains("/api"))
-        for error in [PocketConfigError.missingEndpoint, .malformedEndpoint, .emptyHost, .insecureHTTPNotAllowed, .blankAuthorization] {
+        for error in [PocketConfigError.missingEndpoint, .malformedEndpoint, .emptyHost, .insecureHTTPNotAllowed, .blankAuthorization, .invalidAuthorization] {
             #expect(!error.description.isEmpty)
         }
     }
