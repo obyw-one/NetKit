@@ -43,7 +43,10 @@ let package = Package(
         ),
         .testTarget(
             name: "NetKitTests",
-            dependencies: ["NetKit"],
+            dependencies: [
+                "NetKit",
+                .product(name: "CoreKitTestSupport", package: "CoreKit"),
+            ],
             path: "Tests/NetworkKitTests"
         ),
     ]
