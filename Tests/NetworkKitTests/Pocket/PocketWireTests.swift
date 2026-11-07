@@ -1,5 +1,5 @@
 //
-//  PocketEndPointTests.swift
+//  PocketWireTests.swift
 //  NetworkKitTests
 //
 //  The wire contract of every PocketEndPoint case: method, path, headers,
@@ -12,7 +12,7 @@ import Testing
 @testable import NetKit
 
 @Suite("PocketEndPoint — the PocketBase wire contract")
-struct PocketEndPointTests {
+struct PocketWireTests {
 
     private let config: PocketConfig
 
