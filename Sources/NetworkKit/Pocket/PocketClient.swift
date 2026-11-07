@@ -108,9 +108,9 @@ public protocol PocketClientProtocol: Sendable {
 ///
 /// PocketBase dates decode through the fleet strategy
 /// (`JSONDecoder.pocketbaseDateDecodingStrategy()`). That strategy rejects an
-/// empty string, which is how PocketBase serialises a date field nobody set:
-/// declare such a field `Date?` only after confirming the server sends `null`
-/// rather than `""`, or decode it as a `String`.
+/// empty string, which is how PocketBase serialises a date field nobody set, so
+/// a plain `Date?` property cannot read an unset date: decode optional dates
+/// with ``Swift/KeyedDecodingContainer/decodePocketDateIfPresent(forKey:)``.
 public struct PocketClient: PocketClientProtocol {
     private let config: PocketConfig
     private let transport: any PocketTransport

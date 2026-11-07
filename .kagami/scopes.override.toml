@@ -28,8 +28,9 @@ language = "swift"
 package_path = "."
 test_target_name = "NetKitTests"
 module_patterns = ["NetKitTests"]
-type_patterns = ["PocketConfigTests", "PocketEndPointTests", "PocketListContainerTests", "PocketAuthResponseTests", "PocketErrorBodyTests", "PocketPayloadTests", "PocketQueryTests", "PocketClientTests", "PocketClientErrorTests", "PocketParityTests"]
+type_patterns = ["PocketConfigTests", "PocketEndPointTests", "PocketListContainerTests", "PocketAuthResponseTests", "PocketErrorBodyTests", "PocketPayloadTests", "PocketQueryTests", "PocketClientTests", "PocketClientErrorTests", "PocketParityTests", "PocketDateTests"]
 test_file_patterns = ["**/NetworkKitTests/Pocket/*.swift"]
-expected_test_min = 124
+expected_test_min = 128
 timeout_seconds = 600
-description = "NetKit PocketBase client, offline: config validation, the wire contract of every PocketEndPoint case, the typed error. Stubbed transport only (MockPocketTransport) — nothing here touches a network."
+description = "NetKit PocketBase client, offline: config validation, the wire contract of every PocketEndPoint case, every call and every error path, the unset-date reader and parity with the legacy app-level endpoints. Stubbed transport only (MockPocketTransport) — nothing here touches a network."
+

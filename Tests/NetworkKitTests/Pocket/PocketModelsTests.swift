@@ -317,3 +317,50 @@ struct PocketQueryTests {
         #expect(throws: PocketError.self) { try PocketFilter.literal(value) }
     }
 }
+
+/// A record whose date may be unset.
+private struct MaybeDated: Decodable, Equatable {
+    let due: Date?
+
+    private enum CodingKeys: String, CodingKey {
+        case due
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        due = try container.decodePocketDateIfPresent(forKey: .due)
+    }
+}
+
+@Suite("decodePocketDateIfPresent — an unset PocketBase date")
+struct PocketDateTests {
+
+    private func decode(_ json: String) throws -> MaybeDated {
+        try PocketCodec.decoder().decode(MaybeDated.self, from: Data(json.utf8))
+    }
+
+    @Test("test_date_emptyStringNullAndAbsent_areNil", arguments: [#"{"due":""}"#, #"{"due":null}"#, "{}"])
+    func test_date_emptyStringNullAndAbsent_areNil(_ json: String) throws {
+        #expect(try decode(json).due == nil)
+    }
+
+    @Test("test_date_aRealDate_decodesThroughTheFleetStrategy")
+    func test_date_aRealDate_decodesThroughTheFleetStrategy() throws {
+        let due = try #require(decode(#"{"due":"2024-04-04 13:47:54.692Z"}"#).due)
+        #expect(abs(due.timeIntervalSince1970 - 1_712_238_474.692) < 0.001)
+    }
+
+    @Test("test_date_aMalformedDate_isStillAnError_notNil")
+    func test_date_aMalformedDate_isStillAnError_notNil() {
+        #expect(throws: DecodingError.self) { try decode(#"{"due":"yesterday"}"#) }
+        #expect(throws: DecodingError.self) { try decode(#"{"due":12}"#) }
+    }
+
+    @Test("test_date_aPlainOptionalDate_cannotReadTheEmptyString_whichIsWhyTheHelperExists")
+    func test_date_aPlainOptionalDate_cannotReadTheEmptyString_whichIsWhyTheHelperExists() {
+        struct Naive: Decodable { let due: Date? }
+        #expect(throws: DecodingError.self) {
+            try PocketCodec.decoder().decode(Naive.self, from: Data(#"{"due":""}"#.utf8))
+        }
+    }
+}
