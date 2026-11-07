@@ -21,3 +21,15 @@ test_file_patterns = ["**/NetworkKitTests/DLNATests.swift", "**/NetworkKitTests/
 expected_test_min = 108
 timeout_seconds = 600
 description = "NetKit — the umami wire contract (config validation, endpoint body, UmamiAnswer acceptance) plus DLNA/SSDP and the NetworkService seam."
+
+[[scopes]]
+name = "NetKitPocketTests"
+language = "swift"
+package_path = "."
+test_target_name = "NetKitTests"
+module_patterns = ["NetKitTests"]
+type_patterns = ["PocketConfigTests", "PocketEndPointTests", "PocketListContainerTests", "PocketAuthResponseTests", "PocketErrorBodyTests", "PocketPayloadTests", "PocketQueryTests", "PocketClientTests", "PocketClientErrorTests", "PocketParityTests"]
+test_file_patterns = ["**/NetworkKitTests/Pocket/*.swift"]
+expected_test_min = 124
+timeout_seconds = 600
+description = "NetKit PocketBase client, offline: config validation, the wire contract of every PocketEndPoint case, the typed error. Stubbed transport only (MockPocketTransport) — nothing here touches a network."
