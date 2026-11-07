@@ -23,7 +23,7 @@ public extension NetworkProtocol {
         }
 
         AppLog.network.debug("Request success: \(httpResponse.url?.debugDescription ?? "[no url]")")
-        AppLog.network.debug("Response data: \(data.prettyJson ?? "[Json invalid]")")
+        AppLog.network.debug("Response data: \((try? data.prettyJSON()) ?? "[Json invalid]")")
 
         do {
             let decoder = JSONDecoder()
@@ -36,7 +36,7 @@ public extension NetworkProtocol {
         }
     }
 
-    func sendRequest<T>(endpoint: EndPoint, type: T.Type) -> AnyPublisher<T, NetworkError> where T: Decodable {
+    func sendRequest<T: Decodable>(endpoint: EndPoint, type: T.Type) -> AnyPublisher<T, NetworkError> {
         let urlRequest = createRequest(endPoint: endpoint)
         return URLSession.shared.dataTaskPublisher(for: urlRequest)
             .subscribe(on: DispatchQueue.global(qos: .background))
