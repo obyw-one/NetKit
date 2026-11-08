@@ -68,6 +68,32 @@ All notable changes to NetKit are documented here. This project follows
   caller of the deprecated `Data.prettyJson` (a debug log line) now uses
   `prettyJSON()`.
 
+### `createRequest` no longer crashes or drops a body (API change)
+
+`NetworkProtocol.createRequest(endPoint:)` is now `throws(NetworkError)`.
+
+- Before: a host/path that forms no URL hit `preconditionFailure` and crashed the
+  app at runtime (nothing forces an endpoint to be well formed: the protocol has a
+  default implementation), and a body that failed to encode was `try?`'d away, so the
+  request went out WITHOUT its body. That is how a PocketBase login got a 400 "Cannot
+  be blank" with no local error.
+- Now: `NetworkError.invalidURL(description:)` names scheme, host and path (never the
+  query), and `NetworkError.bodyEncodingFailed(_:)` carries the cause. A body that
+  `JSONSerialization` would raise an Objective-C exception for (a `Date`, `NaN`) is
+  checked first and reported the same way, instead of crashing. Nothing is sent.
+- Every caller propagates it: the `async` and closure `sendRequest` (the closure gets
+  `.failure`), `MockNetworkService` (nothing is captured), the Combine publisher
+  (`Fail`), and so the Umami use case (`TrackUseCaseError.networkError`).
+- `WebSocketClient`'s reconnect no longer reconnects after its sleep is cancelled.
+
+**API break, listed:**
+1. A direct caller of `createRequest(endPoint:)` must now write `try`.
+2. `NetworkError` gains two cases (`invalidURL`, `bodyEncodingFailed`), so an
+   exhaustive `switch` over it needs them (or a `default`).
+3. An external conformer that implemented the old non-throwing `createRequest` still
+   compiles (a non-throwing function satisfies a throwing requirement) but keeps
+   its old behaviour; only the default implementation changed.
+
 ### Linux and the `NetKitApple` split
 
 NetKit now builds on Linux. The Apple-only code moved to a second product,

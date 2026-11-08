@@ -17,14 +17,19 @@ import FoundationNetworking
 /// requirement any more: `Combine` is Apple-only, so it lives in the `NetKitApple`
 /// product as an extension of this protocol (`import NetKitApple` to use it).
 public protocol NetworkProtocol: Sendable {
-    func createRequest(endPoint: EndPoint) -> URLRequest
+    /// Build the `URLRequest` for an endpoint.
+    /// - Throws: ``NetworkError/invalidURL(description:)`` when the endpoint does not form a
+    ///   URL, ``NetworkError/bodyEncodingFailed(_:)`` when its body is not valid JSON. Nothing
+    ///   is sent in either case: a request that silently lost its body is the failure this
+    ///   signature exists to rule out.
+    func createRequest(endPoint: EndPoint) throws(NetworkError) -> URLRequest
 
     func sendRequest<T: Decodable & Sendable>(endpoint: EndPoint) async throws -> T
     func sendRequest<T: Decodable>(endpoint: EndPoint, resultHandler: @escaping @Sendable (Result<T, NetworkError>) -> Void)
 }
 
 public extension NetworkProtocol {
-    func createRequest(endPoint: EndPoint) -> URLRequest {
+    func createRequest(endPoint: EndPoint) throws(NetworkError) -> URLRequest {
         var urlComponents = URLComponents()
         urlComponents.scheme = endPoint.scheme
         urlComponents.host = endPoint.host
@@ -34,16 +39,36 @@ public extension NetworkProtocol {
             urlComponents.queryItems = Array(from: queryParams)
         }
         guard let url = urlComponents.url else {
-            preconditionFailure("Failed to create url with your endPoint setup.")
+            throw .invalidURL(description: "scheme '\(endPoint.scheme)', host '\(endPoint.host)', path '\(endPoint.apiPath + endPoint.path)'")
         }
         var request = URLRequest(url: url)
         request.httpMethod = endPoint.method.rawValue
         request.allHTTPHeaderFields = endPoint.header
         if let body = endPoint.body {
-            request.httpBody = try? body.toJSON([])
+            request.httpBody = try Self.jsonBody(body)
         }
         return request
     }
+
+    /// The JSON bytes of an endpoint body. `JSONSerialization` raises an Objective-C
+    /// exception (a crash, not an error) for a value it cannot represent — a `Date`, a
+    /// `NaN` — so validity is checked first and reported as a typed error.
+    private static func jsonBody(_ body: [String: Any]) throws(NetworkError) -> Data {
+        guard JSONSerialization.isValidJSONObject(body) else {
+            throw .bodyEncodingFailed(BodyNotJSONRepresentable())
+        }
+        do {
+            return try body.toJSON([])
+        } catch {
+            throw .bodyEncodingFailed(error)
+        }
+    }
+}
+
+/// The cause carried by ``NetworkError/bodyEncodingFailed(_:)`` when a body holds a value
+/// JSON cannot represent (a `Date`, `NaN`, infinity, a non-string key, a custom type).
+public struct BodyNotJSONRepresentable: Error, CustomStringConvertible, Sendable {
+    public var description: String { "the body holds a value JSON cannot represent" }
 }
 
 public extension [URLQueryItem] {

@@ -81,7 +81,7 @@ public final class MockNetworkService: NetworkProtocol, Sendable {
     /// status or data. Public so the `NetKitApple` Combine publisher can reuse the
     /// same answer without a second copy of the logic.
     public func response<T: Decodable>(for endpoint: EndPoint) throws -> T {
-        let request = createRequest(endPoint: endpoint)
+        let request = try createRequest(endPoint: endpoint)
         let configuration = state.withLock { state -> State in
             state.capturedRequests.append(request)
             return state

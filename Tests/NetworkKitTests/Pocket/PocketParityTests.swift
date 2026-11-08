@@ -278,7 +278,7 @@ struct PocketParityTests {
 
     @Test("test_parity_legacyBuilder_sendsNoContentType_forABody")
     func test_parity_legacyBuilder_sendsNoContentType_forABody() throws {
-        let request = legacyBuilder.createRequest(endPoint: LegacyEndPoint(
+        let request = try legacyBuilder.createRequest(endPoint: LegacyEndPoint(
             method: .POST, path: "collections/users/auth-with-password", header: ["accept": "application/json"],
             bodyFields: strings(["identity": "i", "password": "p"]), queryFields: nil
         ))
@@ -286,9 +286,9 @@ struct PocketParityTests {
     }
 
     @Test("test_parity_loginBodyThroughTheLegacyBuilder_isLabelledJson_whenTheEndpointIsAPocketEndPoint")
-    func test_parity_loginBodyThroughTheLegacyBuilder_isLabelledJson_whenTheEndpointIsAPocketEndPoint() {
+    func test_parity_loginBodyThroughTheLegacyBuilder_isLabelledJson_whenTheEndpointIsAPocketEndPoint() throws {
         let endpoint = PocketEndPoint.authWithPassword(config: config, collection: "users", identity: "i", password: "p")
-        let request = legacyBuilder.createRequest(endPoint: endpoint)
+        let request = try legacyBuilder.createRequest(endPoint: endpoint)
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
         #expect(request.httpMethod == "POST")
         #expect(request.url?.path == "/api/collections/users/auth-with-password")

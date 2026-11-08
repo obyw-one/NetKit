@@ -13,7 +13,7 @@ import FoundationNetworking
 
 public extension NetworkProtocol {
     func sendRequest<T: Decodable & Sendable>(endpoint: EndPoint) async throws -> T {
-        let urlRequest = createRequest(endPoint: endpoint)
+        let urlRequest = try createRequest(endPoint: endpoint)
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -38,7 +38,13 @@ public extension NetworkProtocol {
     }
 
     func sendRequest<T: Decodable & Sendable>(endpoint: EndPoint, resultHandler: @escaping @Sendable (Result<T, NetworkError>) -> Void) {
-        let urlRequest = createRequest(endPoint: endpoint)
+        let urlRequest: URLRequest
+        do {
+            urlRequest = try createRequest(endPoint: endpoint)
+        } catch {
+            resultHandler(.failure(error))
+            return
+        }
         let urlTask = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
             if let error {
                 resultHandler(.failure(.unknown(error)))

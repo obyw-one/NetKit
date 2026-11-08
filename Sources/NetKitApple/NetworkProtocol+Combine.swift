@@ -17,7 +17,12 @@ public extension NetworkProtocol {
 
     /// The publisher form of `sendRequest(endpoint:)`, over `URLSession`'s data task publisher.
     func sendRequest<T: Decodable>(endpoint: EndPoint, type: T.Type) -> AnyPublisher<T, NetworkError> {
-        let urlRequest = createRequest(endPoint: endpoint)
+        let urlRequest: URLRequest
+        do {
+            urlRequest = try createRequest(endPoint: endpoint)
+        } catch {
+            return Fail(error: error).eraseToAnyPublisher()
+        }
         return URLSession.shared.dataTaskPublisher(for: urlRequest)
             .subscribe(on: DispatchQueue.global(qos: .background))
             .tryMap { data, response -> Data in
