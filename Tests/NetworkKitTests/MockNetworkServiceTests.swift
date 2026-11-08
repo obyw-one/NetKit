@@ -17,13 +17,13 @@ private struct User: Codable, Equatable, Sendable {
     let name: String
 }
 
-private struct MockEndPoint: EndPoint, @unchecked Sendable {
+private struct MockEndPoint: EndPoint {
     var host: String = "api.example.com"
     var path: String = "/users/1"
     var method: RequestMethod = .GET
     var header: [String: String]?
-    var body: [String: Any]?
-    var queryParams: [String: Any]?
+    var body: [String: Any]? { nil }
+    var queryParams: [String: Any]? { nil }
 }
 
 // MARK: - Tests
