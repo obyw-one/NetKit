@@ -5,6 +5,15 @@ All notable changes to NetKit are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **`URLSessionS3Transport`** — the `URLSession` transport for CoreKit's
+  `S3ObjectStoreClient`, moved here from CoreKit (spec d3f8a1b2). CoreKit keeps
+  `S3Transport`, `AWSSignatureV4` and the request/response types and ships no
+  transport; the caller injects this one. Requires a CoreKit release that
+  contains the resource layer (`S3Transport`); the dependency floor is raised
+  when that tag exists. New public type: next release is minor (2.6.0).
+
 ## [2.5.0] — 2026-11-11
 
 Additive only: no existing API changes.
