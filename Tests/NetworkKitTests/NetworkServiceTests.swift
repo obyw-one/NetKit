@@ -6,6 +6,9 @@
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Suite("NetworkService Tests")
 struct NetworkServiceTests {

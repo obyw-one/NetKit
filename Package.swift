@@ -22,9 +22,19 @@ let package = Package(
         .tvOS(.v18),
     ],
     products: [
+        // The platform-neutral core: EndPoint, NetworkProtocol, Umami, PocketBase,
+        // the config endpoint, WebSocket. Builds on Linux.
         .library(
             name: "NetKit",
             targets: ["NetKit"]
+        ),
+        // The Apple-only surface (DLNA / SSDP, NetworkMonitor, the Combine
+        // publisher form of sendRequest) — the way CoreKit keeps CoreKitUI apart
+        // from CoreKit. Every source is wrapped in `#if canImport(Network)` /
+        // `canImport(Combine)`, so the module is empty (not half-typed) off Apple.
+        .library(
+            name: "NetKitApple",
+            targets: ["NetKitApple"]
         ),
     ],
     dependencies: [
@@ -41,10 +51,16 @@ let package = Package(
             dependencies: ["CoreKit"],
             path: "Sources/NetworkKit"
         ),
+        .target(
+            name: "NetKitApple",
+            dependencies: ["NetKit"],
+            path: "Sources/NetKitApple"
+        ),
         .testTarget(
             name: "NetKitTests",
             dependencies: [
                 "NetKit",
+                "NetKitApple",
                 .product(name: "CoreKitTestSupport", package: "CoreKit"),
             ],
             path: "Tests/NetworkKitTests"

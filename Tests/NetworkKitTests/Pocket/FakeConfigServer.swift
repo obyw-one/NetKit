@@ -12,6 +12,9 @@ import CoreKit
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 actor FakeConfigServer: PocketTransport {
     struct Row {

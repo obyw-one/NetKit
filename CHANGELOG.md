@@ -68,14 +68,56 @@ All notable changes to NetKit are documented here. This project follows
   caller of the deprecated `Data.prettyJson` (a debug log line) now uses
   `prettyJSON()`.
 
+### Linux and the `NetKitApple` split
+
+NetKit now builds on Linux. The Apple-only code moved to a second product,
+**`NetKitApple`** (the way CoreKit keeps `CoreKitUI` apart): DLNA / SSDP
+(`DLNABrowser`, `DLNAServer`, `SSDPAdvertiser`, `SSDPSearchResponder`,
+`SSDPBrowser`, `ContentDirectory`, `DLNAMediaItem`, `SSDPMessage`),
+`NetworkMonitor`, and the Combine publisher form of `sendRequest`. Every source
+is wrapped in `#if canImport(Network)` / `canImport(Combine)`, so the module is
+empty off Apple. The `NetKit` product (EndPoint, `NetworkProtocol`,
+`NetworkService`, `MockNetworkService`, Umami, PocketBase, the config endpoint,
+WebSocket) is platform-neutral. `.woodpecker/linux-build.yml` runs the build and
+the offline suites on `swift:6.3-jammy`.
+
+**What changes for an Apple consumer**
+
+- Using DLNA, SSDP or `NetworkMonitor`: add the `NetKitApple` product to the
+  target's dependencies and `import NetKitApple` (no other source change).
+- Using the Combine form `sendRequest(endpoint:type:) -> AnyPublisher`: it is no
+  longer a `NetworkProtocol` requirement but an extension in `NetKitApple`;
+  `import NetKitApple`. A custom conformer that implemented it keeps compiling
+  (it is now an ordinary method), but a call through `any NetworkProtocol` runs
+  the extension's URLSession implementation.
+- `DLNAServer.onReady` is now `@Sendable` (it is called from the server's queue).
+- Added: `MockNetworkService.response(for:)`, `ContentDirectory.isEmpty`.
+- Everything else is source-compatible.
+
+### Concurrency
+
+No `@unchecked Sendable` remains in `Sources/`.
+
+- `MockNetworkService`, `ContentDirectory`, `SSDPAdvertiser`,
+  `SSDPSearchResponder`, `SSDPBrowser`, `DLNABrowser`, `DLNAServer`: mutable
+  state is one value behind the platform's own Sendable lock
+  (`OSAllocatedUnfairLock`; `Synchronization.Mutex` off Apple for the mock), so
+  the compiler checks the claim. Delegates and callbacks are called outside the
+  lock. These classes were racy before: `start()`, `stop()`, `servers` and `port`
+  touched state from the caller's thread while the Network callbacks wrote it on
+  a queue. Restarting now cancels the previous connection or listener instead of
+  leaking it.
+- `DLNAServer.ChunkState` is gone: the byte count left to send travels by value
+  through each chunk's completion handler.
+- `UmamiEndPoint` never needed `@unchecked`: its payload is `UmamiConfig` and
+  `[String: String]`, both Sendable.
+
 ### Notes
 
-- NetKit does not build on Linux: `import Network` (DLNA, `NetworkMonitor`) and
-  `Combine` (`NetworkProtocol`) are Apple-only. Unchanged by this release. The
-  new PocketBase files import neither and carry the conditional
-  `FoundationNetworking` import; compiled in isolation on Linux (Swift 6.3) they
-  build cleanly and their 112 offline tests pass. `EndPoint.swift`, which they
-  conform to, still lacks that import and was left alone.
+- `EndPoint.swift`, `WebSocketClient.swift` and the tests import
+  `FoundationNetworking` where `URLRequest` is used.
+- The PocketBase files and the whole core build and pass their offline tests on
+  Linux (Swift 6.3).
 
 - **`URLSessionS3Transport`** — the `URLSession` transport for CoreKit's
   `S3ObjectStoreClient`, moved here from CoreKit (spec d3f8a1b2). CoreKit keeps

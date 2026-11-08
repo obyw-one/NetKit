@@ -10,6 +10,9 @@
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 enum PocketFixtures {
     static let root = "https://pocket.example.test"

@@ -1,9 +1,13 @@
+#if canImport(Network)
 import Foundation
+import os
 
 /// UPnP Content Directory Service — manages and serves media item metadata as DIDL-Lite XML.
-public final class ContentDirectory: @unchecked Sendable {
-    private var items: [DLNAMediaItem] = []
-    private let lock = NSLock()
+public final class ContentDirectory: Sendable {
+    // The items live in one value behind the platform's own Sendable lock
+    // (not an `NSLock` beside a `var` under `@unchecked Sendable`), so the compiler
+    // checks that nothing reads or writes them outside `withLock`.
+    private let storage = OSAllocatedUnfairLock<[DLNAMediaItem]>(initialState: [])
 
     public init() {}
 
@@ -11,32 +15,29 @@ public final class ContentDirectory: @unchecked Sendable {
 
     /// Replace all items in the directory.
     public func setItems(_ newItems: [DLNAMediaItem]) {
-        lock.lock()
-        items = newItems
-        lock.unlock()
+        storage.withLock { $0 = newItems }
     }
 
     /// Current number of items.
     public var count: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return items.count
+        storage.withLock { $0.count }
+    }
+
+    /// `true` when the directory holds no item.
+    public var isEmpty: Bool {
+        storage.withLock { $0.isEmpty }
     }
 
     /// Get all items (snapshot).
     public var allItems: [DLNAMediaItem] {
-        lock.lock()
-        defer { lock.unlock() }
-        return items
+        storage.withLock { $0 }
     }
 
     // MARK: - Browse
 
     /// Browse the content directory. ObjectID "0" returns the root container.
     public func browse(objectID: String, startIndex: Int = 0, requestedCount: Int = 0) -> BrowseResult {
-        lock.lock()
-        let snapshot = items
-        lock.unlock()
+        let snapshot = allItems
 
         if objectID == "0" {
             let total = snapshot.count
@@ -55,9 +56,7 @@ public final class ContentDirectory: @unchecked Sendable {
 
     /// Search items by title substring (case-insensitive).
     public func search(query: String) -> [DLNAMediaItem] {
-        lock.lock()
-        let snapshot = items
-        lock.unlock()
+        let snapshot = allItems
 
         let lowered = query.lowercased()
         return snapshot.filter { $0.title.lowercased().contains(lowered) }
@@ -182,3 +181,4 @@ extension ContentDirectory {
         """
     }
 }
+#endif

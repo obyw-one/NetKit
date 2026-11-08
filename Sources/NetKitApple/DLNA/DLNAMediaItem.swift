@@ -1,3 +1,4 @@
+#if canImport(Network)
 import Foundation
 
 /// A media item exposed via DLNA Content Directory.
@@ -62,3 +63,4 @@ extension DLNAMediaItem {
         }
     }
 }
+#endif

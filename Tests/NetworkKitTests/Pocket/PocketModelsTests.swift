@@ -10,6 +10,9 @@ import CoreKit
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Suite("PocketListContainer — the paged-list envelope")
 struct PocketListContainerTests {

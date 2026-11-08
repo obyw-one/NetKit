@@ -10,6 +10,9 @@ import CoreKit
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Suite("PocketEndPoint — the PocketBase wire contract")
 struct PocketWireTests {

@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public enum RequestMethod: String, Sendable {
     case GET
@@ -34,7 +37,6 @@ extension EndPoint {
     public var apiPath: String { "" }
     public var apiFilePath: String { "" }
 }
-
 
 // MARK: - Useful to manage url of endPoint
 

@@ -4,6 +4,9 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Actor-based WebSocket client with automatic reconnection.
 ///

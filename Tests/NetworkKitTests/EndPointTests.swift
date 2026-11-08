@@ -6,20 +6,23 @@
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // MARK: - Test EndPoint
 
 struct TestEndPoint: EndPoint, @unchecked Sendable {
     var host: String = "api.example.com"
-    var port: Int? = nil
+    var port: Int?
     var scheme: String = "https"
     var apiPath: String = "/api/v1"
     var apiFilePath: String = ""
     var path: String = "/users"
     var method: RequestMethod = .GET
     var header: [String: String]? = ["Authorization": "Bearer token123"]
-    var body: [String: Any]? = nil
-    var queryParams: [String: Any]? = nil
+    var body: [String: Any]?
+    var queryParams: [String: Any]?
 }
 
 // MARK: - Tests
@@ -33,16 +36,16 @@ struct EndPointTests {
             var host: String = "example.com"
             var path: String = "/test"
             var method: RequestMethod = .GET
-            var header: [String: String]? = nil
-            var body: [String: Any]? = nil
-            var queryParams: [String: Any]? = nil
+            var header: [String: String]?
+            var body: [String: Any]?
+            var queryParams: [String: Any]?
         }
 
         let endpoint = MinimalEndPoint()
         #expect(endpoint.scheme == "https")
         #expect(endpoint.port == nil)
-        #expect(endpoint.apiPath == "")
-        #expect(endpoint.apiFilePath == "")
+        #expect(endpoint.apiPath.isEmpty)
+        #expect(endpoint.apiFilePath.isEmpty)
     }
 
     @Test("RequestMethod raw values")

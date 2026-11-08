@@ -22,6 +22,9 @@ import CoreKit
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// One call the server's own request log must show.
 private struct ExpectedCall {
@@ -404,13 +407,12 @@ struct PocketLiveTests {
         // Through the shared NetworkProtocol with the legacy endpoint shape (no Content-Type):
         // URLSession labels the body form-urlencoded, and PocketBase cannot read the identity.
         let legacy = LegacyLogin(host: "127.0.0.1", port: server.config.port, identity: email, password: password)
-        let rejected = await Result { () async throws -> PocketAuthResponse<Account> in
-            try await NetworkService().sendRequest(endpoint: legacy)
+        do {
+            let _: PocketAuthResponse<Account> = try await NetworkService().sendRequest(endpoint: legacy)
+            Issue.record("expected the legacy shape to be rejected")
+        } catch NetworkError.unexpectedStatusCode(let status, _) {
+            #expect(status == 400)
         }
-        guard case .failure(let failure) = rejected, case NetworkError.unexpectedStatusCode(let status, _) = failure else {
-            Issue.record("expected the legacy shape to be rejected with unexpectedStatusCode, got \(rejected)"); return
-        }
-        #expect(status == 400)
 
         // The same credentials through PocketEndPoint's own labelling succeed.
         let accepted: PocketAuthResponse<Account> = try await server.client.authWithPassword(

@@ -12,6 +12,9 @@ import CoreKitTestSupport
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Suite("PocketConfigEndpoint — CoreKit's ConfigEndpoint over PocketBase")
 struct PocketConfigEndpointTests {

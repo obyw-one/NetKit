@@ -13,8 +13,10 @@
 
 import Foundation
 import Testing
-
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// `EndPoint` is a protocol, so a test supplies its own conformer — same shape
 /// as `MockEndPoint` in `MockNetworkServiceTests`.

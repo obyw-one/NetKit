@@ -9,6 +9,9 @@
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Suite("PocketConfig — injected, validated, no default URL")
 struct PocketConfigTests {

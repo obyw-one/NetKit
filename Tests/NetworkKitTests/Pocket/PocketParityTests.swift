@@ -19,6 +19,9 @@ import CoreKit
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// The legacy builder: an `EndPoint` described the old way, with the host
 /// global replaced by a constant, built by the shared `createRequest`.

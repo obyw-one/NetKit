@@ -16,6 +16,9 @@ import CoreKit
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 enum LiveEnvKey: String, EnvironmentKey {
     case url = "NETKIT_POCKETBASE_URL"

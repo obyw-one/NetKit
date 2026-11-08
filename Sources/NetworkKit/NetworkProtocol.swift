@@ -5,16 +5,22 @@
 //  Extracted from WabiSabi — Created by Jeoffrey Thirot on 12/02/2024.
 //
 
-import Combine
 import CoreKit
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
+/// The platform-neutral request/response abstraction (builds on Linux).
+///
+/// The Combine publisher variant, `sendRequest(endpoint:type:)`, is NOT a
+/// requirement any more: `Combine` is Apple-only, so it lives in the `NetKitApple`
+/// product as an extension of this protocol (`import NetKitApple` to use it).
 public protocol NetworkProtocol: Sendable {
     func createRequest(endPoint: EndPoint) -> URLRequest
 
     func sendRequest<T: Decodable & Sendable>(endpoint: EndPoint) async throws -> T
     func sendRequest<T: Decodable>(endpoint: EndPoint, resultHandler: @escaping @Sendable (Result<T, NetworkError>) -> Void)
-    func sendRequest<T: Decodable>(endpoint: EndPoint, type: T.Type) -> AnyPublisher<T, NetworkError>
 }
 
 public extension NetworkProtocol {

@@ -9,6 +9,9 @@
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// A model whose own decoder throws something that is not a `DecodingError`.
 private struct Picky: Decodable, Sendable {
