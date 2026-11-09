@@ -5,6 +5,37 @@ All notable changes to NetKit are documented here. This project follows
 
 ## [Unreleased]
 
+## [2.6.0] — unreleased
+
+Version note: 2.5.0 is claimed by the open `URLSessionS3Transport` PR (#20), so this
+minor takes 2.6.0. It is additive only.
+
+### Added
+
+- **The umami READ endpoints**, extracted from the standalone UmamiKit
+  (`shikki-io/UmamiKit`, which has no consumer and cannot build outside one
+  machine). Reading an event back is what lets "did it land?" be asserted by a
+  test instead of by a dashboard visit — a `200` from `/api/send` proves
+  nothing, since umami answers `200 {"beep":"boop"}` when its bot filter
+  discards an event.
+  - `UmamiReadConfig` — endpoint, website id and an INJECTED bearer token. No URL
+    is baked in. The token is redacted from `description`, `debugDescription`
+    and `dump`.
+  - `UmamiReadEndPoint` — `stats`, `pageViews`, `metrics`, `events`,
+    `eventSeries`, `active`. Every case is a `GET` carrying the bearer.
+  - `UmamiReadClient` — typed calls over any `NetworkProtocol`, plus
+    `eventCount(named:in:)`.
+  - `UmamiMetricRow`, `UmamiReadStats`, `UmamiEventPage` and friends.
+  - Named `UmamiRead*` so nothing collides with `UmamiEndPoint`, `UmamiConfig`
+    or `UmamiAnswer`.
+- The send path is untouched and stays unauthenticated (BR-UMA-04):
+  `UmamiEndPoint.track` accepts only a `UmamiConfig`, which a read token cannot
+  be put into.
+
+Not extracted from UmamiKit, on purpose: dashboards, A/B experiments, revenue,
+attribution, the provisioner and `CMSClient` are product surface, not a network
+kit's job.
+
 ## [2.4.0] — 2026-10-28
 
 ### Added
