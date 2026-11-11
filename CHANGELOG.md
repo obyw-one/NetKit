@@ -56,6 +56,14 @@ All notable changes to NetKit are documented here. This project follows
   `ConfigEndpointConformance` over a fake server (offline) and over a real
   PocketBase 0.25.9 (live scope), and drives CoreKit's `AppConfigService`.
 
+- **`URLSessionS3Transport`** — the `URLSession` transport for CoreKit's
+  `S3ObjectStoreClient`, moved here from CoreKit (spec d3f8a1b2). CoreKit keeps
+  `S3Transport`, `AWSSignatureV4` and the request/response types and ships no
+  transport; the caller injects this one. Its two ends are pure functions
+  (`urlRequest(for:)`, `response(data:response:operation:)`) and the loader is
+  injected, so it is tested by return value, not by intercepting the network.
+  New public type: next release is minor (2.6.0).
+
 ### Changed
 
 - **CoreKit is `https://github.com/obyw-one/CoreKit.git` from `0.16.0`** (was the
@@ -151,19 +159,6 @@ No `@unchecked Sendable` remains in `Sources/`.
   `FoundationNetworking` where `URLRequest` is used.
 - The PocketBase files and the whole core build and pass their offline tests on
   Linux (Swift 6.3).
-
-- **`URLSessionS3Transport`** — the `URLSession` transport for CoreKit's
-  `S3ObjectStoreClient`, moved here from CoreKit (spec d3f8a1b2). CoreKit keeps
-  `S3Transport`, `AWSSignatureV4` and the request/response types and ships no
-  transport; the caller injects this one. Its two ends are pure functions
-  (`urlRequest(for:)`, `response(data:response:operation:)`) and the loader is
-  injected, so it is tested by return value, not by intercepting the network.
-  New public type: next release is minor (2.6.0).
-
-### Changed
-
-- **CoreKit floor: 0.16.0**, the first CoreKit release that no longer declares
-  its own `URLSessionS3Transport` (0.14/0.15 would make the name ambiguous).
 
 ## [2.5.0] — 2026-11-11
 
