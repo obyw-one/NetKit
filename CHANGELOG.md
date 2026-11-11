@@ -5,6 +5,18 @@ All notable changes to NetKit are documented here. This project follows
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-11-11
+
+One release for the four PRs merged since 2.4.0: the PocketBase client and config
+endpoint with the Linux split (#18), `URLSessionS3Transport` (#20), the umami read
+endpoints (#21) and the Apache-2.0 relicence (#19).
+
+**Major, because it breaks source:** `NetworkProtocol.createRequest(endPoint:)` now
+throws and `NetworkError` gains two cases (see "`createRequest` no longer crashes"),
+and DLNA / SSDP / `NetworkMonitor` / the Combine `sendRequest` move to the new
+`NetKitApple` product (see "Linux and the `NetKitApple` split"). A consumer on
+`from: "2.x"` does not pick this up by itself; each change below says what to edit.
+
 ### Added
 
 - **`PocketEndPoint` and `PocketClient` — a generic PocketBase client, beside
@@ -62,7 +74,31 @@ All notable changes to NetKit are documented here. This project follows
   transport; the caller injects this one. Its two ends are pure functions
   (`urlRequest(for:)`, `response(data:response:operation:)`) and the loader is
   injected, so it is tested by return value, not by intercepting the network.
-  New public type: next release is minor (2.6.0).
+  New public type.
+
+- **The umami READ endpoints**, extracted from the standalone UmamiKit
+  (`shikki-io/UmamiKit`, which has no consumer and cannot build outside one
+  machine). Reading an event back is what lets "did it land?" be asserted by a
+  test instead of by a dashboard visit — a `200` from `/api/send` proves
+  nothing, since umami answers `200 {"beep":"boop"}` when its bot filter
+  discards an event.
+  - `UmamiReadConfig` — endpoint, website id and an INJECTED bearer token. No URL
+    is baked in. The token is redacted from `description`, `debugDescription`
+    and `dump`.
+  - `UmamiReadEndPoint` — `stats`, `pageViews`, `metrics`, `events`,
+    `eventSeries`, `active`. Every case is a `GET` carrying the bearer.
+  - `UmamiReadClient` — typed calls over any `NetworkProtocol`, plus
+    `eventCount(named:in:)`.
+  - `UmamiMetricRow`, `UmamiReadStats`, `UmamiEventPage` and friends.
+  - Named `UmamiRead*` so nothing collides with `UmamiEndPoint`, `UmamiConfig`
+    or `UmamiAnswer`.
+- The send path is untouched and stays unauthenticated (BR-UMA-04):
+  `UmamiEndPoint.track` accepts only a `UmamiConfig`, which a read token cannot
+  be put into.
+
+Not extracted from UmamiKit, on purpose: dashboards, A/B experiments, revenue,
+attribution, the provisioner and `CMSClient` are product surface, not a network
+kit's job.
 
 ### Changed
 
@@ -82,6 +118,11 @@ All notable changes to NetKit are documented here. This project follows
   `scripts/pocketbase-live.sh`, which now runs the official PocketBase binary
   (default 0.40.6, checksum-pinned) with no container and no system temp
   directory.
+- **`UmamiEndPoint` and `UmamiReadEndPoint` are checked `Sendable`**, no longer
+  `@unchecked`: every associated value is `Sendable`, so the compiler now proves it
+  instead of being told to skip the check.
+- **Licence: Apache-2.0** (was AGPL-3.0, #19). Libraries other people link are
+  Apache-2.0; the copyright holder is OBYW.one SASU. See `NOTICE`.
 
 ### `createRequest` no longer crashes or drops a body (API change)
 
@@ -159,44 +200,6 @@ No `@unchecked Sendable` remains in `Sources/`.
   `FoundationNetworking` where `URLRequest` is used.
 - The PocketBase files and the whole core build and pass their offline tests on
   Linux (Swift 6.3).
-
-## [2.5.0] — 2026-11-11
-
-Additive only: no existing API changes.
-
-### Added
-
-- **The umami READ endpoints**, extracted from the standalone UmamiKit
-  (`shikki-io/UmamiKit`, which has no consumer and cannot build outside one
-  machine). Reading an event back is what lets "did it land?" be asserted by a
-  test instead of by a dashboard visit — a `200` from `/api/send` proves
-  nothing, since umami answers `200 {"beep":"boop"}` when its bot filter
-  discards an event.
-  - `UmamiReadConfig` — endpoint, website id and an INJECTED bearer token. No URL
-    is baked in. The token is redacted from `description`, `debugDescription`
-    and `dump`.
-  - `UmamiReadEndPoint` — `stats`, `pageViews`, `metrics`, `events`,
-    `eventSeries`, `active`. Every case is a `GET` carrying the bearer.
-  - `UmamiReadClient` — typed calls over any `NetworkProtocol`, plus
-    `eventCount(named:in:)`.
-  - `UmamiMetricRow`, `UmamiReadStats`, `UmamiEventPage` and friends.
-  - Named `UmamiRead*` so nothing collides with `UmamiEndPoint`, `UmamiConfig`
-    or `UmamiAnswer`.
-- The send path is untouched and stays unauthenticated (BR-UMA-04):
-  `UmamiEndPoint.track` accepts only a `UmamiConfig`, which a read token cannot
-  be put into.
-
-Not extracted from UmamiKit, on purpose: dashboards, A/B experiments, revenue,
-attribution, the provisioner and `CMSClient` are product surface, not a network
-kit's job.
-
-### Changed
-
-- **`UmamiEndPoint` and `UmamiReadEndPoint` are checked `Sendable`**, no longer
-  `@unchecked`: every associated value is `Sendable`, so the compiler now proves it
-  instead of being told to skip the check.
-- **Licence: Apache-2.0** (was AGPL-3.0, #19). Libraries other people link are
-  Apache-2.0; the copyright holder is OBYW.one SASU. See `NOTICE`.
 
 ## [2.4.0] — 2026-10-28
 
