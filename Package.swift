@@ -28,7 +28,12 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/FJ-Studios/CoreKit.git", from: "0.1.0"),
+        // 0.16.0 is the first CoreKit WITHOUT its own URLSessionS3Transport
+        // (obyw-one/CoreKit#34): 0.14/0.15 declare the type too, and this
+        // target's copy is then "ambiguous for type lookup" (measured). 0.14.0
+        // is where `S3Transport` itself appeared. Canonical org is obyw-one;
+        // `FJ-Studios/CoreKit` only resolved through GitHub's transfer redirect.
+        .package(url: "https://github.com/obyw-one/CoreKit.git", from: "0.16.0"),
     ],
     targets: [
         .target(
