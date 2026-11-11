@@ -9,7 +9,7 @@
 
 import Foundation
 
-public enum UmamiEndPoint: EndPoint, @unchecked Sendable {
+public enum UmamiEndPoint: EndPoint {
 
   /// Track a single umami event.
   ///

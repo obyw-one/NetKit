@@ -40,7 +40,7 @@ public enum UmamiReadUnit: String, Sendable {
   case minute, hour, day, month, year
 }
 
-public enum UmamiReadEndPoint: EndPoint, @unchecked Sendable {
+public enum UmamiReadEndPoint: EndPoint {
 
   /// `GET /api/websites/:id/stats`
   case stats(config: UmamiReadConfig, range: UmamiReadRange)
@@ -109,9 +109,8 @@ public enum UmamiReadEndPoint: EndPoint, @unchecked Sendable {
       if let limit { query["limit"] = String(limit) }
       return query
     case .events(_, let range, let search, let page, let pageSize):
-      var query = window(range).merging(["page": String(page), "pageSize": String(pageSize)]) {
-        _, new in new
-      }
+      let paging = ["page": String(page), "pageSize": String(pageSize)]
+      var query = window(range).merging(paging) { _, new in new }
       if let search, !search.isEmpty { query["search"] = search }
       return query
     case .active:
