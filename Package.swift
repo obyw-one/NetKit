@@ -20,6 +20,10 @@ let package = Package(
         // consuming app cannot paper over this — SwiftPM resolves each package
         // at that package's declared minimum.
         .tvOS(.v18),
+        // visionOS runs iOS 17 code, so whatever builds for iOS must build there too (operator rule,
+        // 2026-11-08). visionOS 1 is the iOS 17 generation. CoreKit declares no visionOS and so builds at
+        // SwiftPM's default floor, which is below this one; Network, Combine and os all exist on visionOS.
+        .visionOS(.v1),
     ],
     products: [
         // The platform-neutral core: EndPoint, NetworkProtocol, Umami, PocketBase,

@@ -3,8 +3,8 @@
 # The Linux pipeline (linux-build.yml) proves the platform-neutral NetKit product builds and passes with no Apple
 # framework, and it has to leave out the live PocketBase suites. This one proves what Linux cannot: the macOS suites
 # (DLNA/SSDP and the NetworkMonitor in NetKitApple included) run through kagami with `--strict`, the live PocketBase
-# round trip runs against a REAL throwaway server, and the package still builds for the iOS Simulator and the tvOS
-# Simulator (the platforms Package.swift declares).
+# round trip runs against a REAL throwaway server, and the package still builds for macOS and for the iOS, tvOS and
+# visionOS Simulators (the platforms Package.swift declares: whatever builds for iOS must build for visionOS too).
 #
 # WHERE IT RUNS. On the maintainer's own Mac, through a Woodpecker agent on the `local` backend: the steps run
 # DIRECTLY on that machine as the user who owns the agent, with no container around them. That is why the triggers
@@ -94,3 +94,14 @@ steps:
     image: bash
     commands:
       - xcodebuild build -scheme NetKit-Package -destination 'generic/platform=tvOS Simulator' -derivedDataPath "$$(pwd)/.derived/tvos" CODE_SIGNING_ALLOWED=NO
+
+  visionos-simulator-build:
+    image: bash
+    commands:
+      - xcodebuild build -scheme NetKit-Package -destination 'generic/platform=visionOS Simulator' -derivedDataPath "$$(pwd)/.derived/visionos" CODE_SIGNING_ALLOWED=NO
+
+  # The same package, built as a macOS library (kagami builds the test target; this builds every product).
+  macos-build:
+    image: bash
+    commands:
+      - xcodebuild build -scheme NetKit-Package -destination 'generic/platform=macOS' -derivedDataPath "$$(pwd)/.derived/macos" CODE_SIGNING_ALLOWED=NO
