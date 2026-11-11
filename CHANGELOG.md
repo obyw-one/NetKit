@@ -5,10 +5,9 @@ All notable changes to NetKit are documented here. This project follows
 
 ## [Unreleased]
 
-## [2.6.0] — unreleased
+## [2.5.0] — 2026-11-11
 
-Version note: 2.5.0 is claimed by the open `URLSessionS3Transport` PR (#20), so this
-minor takes 2.6.0. It is additive only.
+Additive only: no existing API changes.
 
 ### Added
 
@@ -35,6 +34,14 @@ minor takes 2.6.0. It is additive only.
 Not extracted from UmamiKit, on purpose: dashboards, A/B experiments, revenue,
 attribution, the provisioner and `CMSClient` are product surface, not a network
 kit's job.
+
+### Changed
+
+- **`UmamiEndPoint` and `UmamiReadEndPoint` are checked `Sendable`**, no longer
+  `@unchecked`: every associated value is `Sendable`, so the compiler now proves it
+  instead of being told to skip the check.
+- **Licence: Apache-2.0** (was AGPL-3.0, #19). Libraries other people link are
+  Apache-2.0; the copyright holder is OBYW.one SASU. See `NOTICE`.
 
 ## [2.4.0] — 2026-10-28
 
