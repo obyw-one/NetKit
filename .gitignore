@@ -29,3 +29,6 @@ build/
 # The hand-authored `scopes.override.toml` is the source of truth.
 .kagami/*
 !.kagami/scopes.override.toml
+
+# xcodebuild derived data from the macOS gate (.woodpecker/macos-gate.yml --derivedDataPath)
+.derived/
