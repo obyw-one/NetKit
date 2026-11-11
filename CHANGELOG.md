@@ -43,8 +43,8 @@ All notable changes to NetKit are documented here. This project follows
   and PocketBase answers "Cannot be blank"), and an update is a PATCH (PocketBase
   has no PUT route for records: it answers 404).
 
-  Verified against a real PocketBase 0.25.9 and 0.40.6 started with podman:
-  `scripts/pocketbase-live.sh -- kagami test --scope NetKitPocketLiveTests --strict`.
+  Verified against a real PocketBase (0.25.9, then 0.40.6) started by
+  `scripts/pocketbase-live.sh -- kagami test --all --strict`.
 
 - **`PocketConfigEndpoint` — CoreKit's `ConfigEndpoint` over PocketBase.**
   Fetches the server-driven `AppConfig` from a PocketBase collection (one
@@ -58,15 +58,22 @@ All notable changes to NetKit are documented here. This project follows
 
 ### Changed
 
-- **CoreKit is pinned by REVISION `31925e5`** (the `epic/d3f8a1b2-resource-layer`
-  branch, which carries `ConfigEndpoint` and `ConfigEndpointConformance`) until
-  CoreKit tags a release; the test target gains the `CoreKitTestSupport`
-  product.
-- **CoreKit is now `https://github.com/obyw-one/CoreKit.git` from `0.13.0`**
-  (was the `FJ-Studios` URL from `0.1.0`). Resolution moves swift-crypto to
-  4.5.2 and adds swift-log 1.17.0, both transitive through CoreKit. The one
+- **CoreKit is `https://github.com/obyw-one/CoreKit.git` from `0.16.0`** (was the
+  `FJ-Studios` URL from `0.1.0`). `ConfigEndpoint` and its conformance suite shipped
+  in 0.14.0; 0.16.0 is the first release without CoreKit's own
+  `URLSessionS3Transport`. The test target gains `CoreKitTestSupport`. The one
   caller of the deprecated `Data.prettyJson` (a debug log line) now uses
   `prettyJSON()`.
+- **Platforms: visionOS 1 added.** Whatever builds for iOS builds for visionOS;
+  the macOS gate builds the package for macOS and the visionOS Simulator too.
+- **Dispatch queue labels are `one.obyw.netkit.*`** (were `net.netkit.*`), from one
+  `NetKitQueueLabel` enum instead of five literals.
+- **The TypeScript sibling is `@obyw-one/netkit-web`, Apache-2.0** (was
+  `@fj-studios/netkit-web`, MIT; never published under either name).
+- **The macOS gate is one `kagami test --all --strict`** under
+  `scripts/pocketbase-live.sh`, which now runs the official PocketBase binary
+  (default 0.40.6, checksum-pinned) with no container and no system temp
+  directory.
 
 ### `createRequest` no longer crashes or drops a body (API change)
 
