@@ -29,7 +29,7 @@ public final class SSDPAdvertiser: Sendable {
     private let deviceType: String
 
     private let state = OSAllocatedUnfairLock(initialState: State())
-    private let queue = DispatchQueue(label: "net.netkit.ssdp.advertiser")
+    private let queue = NetKitQueueLabel.ssdpAdvertiser.makeQueue()
 
     public init(
         location: String,
@@ -134,7 +134,7 @@ public final class SSDPSearchResponder: Sendable {
     private let deviceType: String
 
     private let listener = OSAllocatedUnfairLock<NWListener?>(initialState: nil)
-    private let queue = DispatchQueue(label: "net.netkit.ssdp.searchResponder")
+    private let queue = NetKitQueueLabel.ssdpSearchResponder.makeQueue()
 
     public init(
         location: String,
@@ -228,7 +228,7 @@ public final class SSDPBrowser: Sendable {
 
     private let searchTarget: String
     private let state = OSAllocatedUnfairLock(initialState: State())
-    private let queue = DispatchQueue(label: "net.netkit.ssdp.browser")
+    private let queue = NetKitQueueLabel.ssdpBrowser.makeQueue()
 
     /// Notified of discovered and lost devices, on the browser's queue.
     public var delegate: SSDPDelegate? {

@@ -33,7 +33,7 @@ public final class DLNAServer: Sendable {
     public let uuid: String
     public let contentDirectory = ContentDirectory()
 
-    private let queue = DispatchQueue(label: "net.netkit.dlna.server")
+    private let queue = NetKitQueueLabel.dlnaServer.makeQueue()
     private let state = OSAllocatedUnfairLock(initialState: State())
 
     /// Called when the server is ready and the port is assigned. Called on the

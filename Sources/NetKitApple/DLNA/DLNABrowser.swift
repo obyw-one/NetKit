@@ -38,7 +38,7 @@ public final class DLNABrowser: Sendable {
 
     private let ssdpBrowser = SSDPBrowser(searchTarget: SSDPConstants.mediaServerType)
     private let state = OSAllocatedUnfairLock(initialState: State())
-    private let queue = DispatchQueue(label: "net.netkit.dlna.browser")
+    private let queue = NetKitQueueLabel.dlnaBrowser.makeQueue()
 
     /// Notified of discovered and lost servers, on the browser's queue.
     public var delegate: DLNABrowserDelegate? {

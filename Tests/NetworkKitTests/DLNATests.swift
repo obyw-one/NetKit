@@ -510,5 +510,22 @@ struct DLNATests {
             #expect(items.isEmpty)
         }
     }
+
+    // MARK: - Queue labels (#18 review: one reverse-DNS root, spelled once)
+
+    @Suite("NetKit queue labels")
+    struct QueueLabelTests {
+        @Test("every queue label is under OBYW.one's one.obyw.netkit root, and none repeats")
+        func labelsShareTheOBYWRoot() {
+            let labels = NetKitQueueLabel.allCases.map(\.label)
+            #expect(labels.allSatisfy { $0.hasPrefix("one.obyw.netkit.") })
+            #expect(Set(labels).count == labels.count)
+        }
+
+        @Test("a queue made from a case carries that case's label")
+        func queueCarriesItsLabel() {
+            #expect(NetKitQueueLabel.dlnaBrowser.makeQueue().label == "one.obyw.netkit.dlna.browser")
+        }
+    }
 }
 #endif
