@@ -35,9 +35,9 @@ steps:
   # (macOS-only tool, private dependencies; spec 4965545a). Replace this step with kagami once it does.
   #
   # The live PocketBase suites (PocketLiveTests, PocketConfigLiveTests) need a throwaway PocketBase started by
-  # scripts/pocketbase-live.sh with podman. They FAIL without it by design (they never skip), so they are
-  # excluded here and this pipeline proves the build plus the offline suites; the live round trip is run from a
-  # machine with podman. The DLNA tests are compiled out on Linux (`#if canImport(Network)`).
+  # scripts/pocketbase-live.sh. They FAIL without it by design (they never skip), so they are excluded here and
+  # this pipeline proves the build plus the offline suites; the live round trip runs in the macOS gate. The DLNA
+  # tests are compiled out on Linux (`#if canImport(Network)`).
   linux-test:
     image: *swift_image
     commands:

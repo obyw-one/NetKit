@@ -26,9 +26,9 @@
 #
 # STATE LEFT ON THE MAC (accepted: the agent runs one workflow at a time).
 #   * kagami appends its run history to the user's `~/.kagami`;
-#   * the live PocketBase step uses the user's podman: it builds a small image from the official release zip (checked
-#     against a pinned sha256), runs ONE throwaway container with an in-memory data directory, and removes the
-#     container and the image when it ends, whatever the outcome. Podman's own layer cache (the alpine base) stays;
+#   * the live PocketBase server is the official release binary for this Mac (checked against a pinned sha256),
+#     cached in the workspace's .build/pocketbase/; each run's data directory lives in .build/pocketbase-live/ and
+#     is removed when the run ends, whatever the outcome. No container, no image;
 #   * SwiftPM keeps its shared package and manifest caches under the user's home, as for any `swift build`.
 # Nothing else is written outside the workspace.
 #
@@ -66,22 +66,17 @@ steps:
       - xcodebuild -version
       - kagami --version
 
-  # One kagami invocation per scope declared in .kagami/scopes.override.toml, each with `--strict` (a run that
-  # executed nothing, or fewer tests than the scope's floor, is exit 2, never green).
+  # Every scope declared in .kagami/scopes.override.toml, in ONE invocation: `kagami test --all --strict` (a scope
+  # that executed nothing, or fewer tests than its floor, is exit 2, never green; a scope added to the registry is
+  # gated without editing this file). It runs under scripts/pocketbase-live.sh because the live PocketBase suite FAILS
+  # without a server by design (it never skips: kagami counts skipped rows toward the floor and exits 0 on an
+  # all-skipped scope). The script runs the official PocketBase binary on a free localhost port, exports the
+  # live-test environment to the command, and stops the server and deletes its data on every exit path. It exits
+  # with the command's status, and 69/70 when a tool or the server is unavailable: green only with a real server.
   kagami-gate:
     image: bash
     commands:
-      - kagami test --scope NetKitTests --strict
-      - kagami test --scope NetKitPocketTests --strict
-
-  # The live PocketBase suite FAILS without a server by design (it never skips: kagami counts skipped rows toward the
-  # floor and exits 0 on an all-skipped scope). scripts/pocketbase-live.sh starts a throwaway PocketBase in podman,
-  # exports the live-test environment to the command, and removes the container on every exit path. It exits with
-  # the command's status, and 69/70 when podman or the server is unavailable: this step is green only with a real server.
-  kagami-live-pocketbase:
-    image: bash
-    commands:
-      - scripts/pocketbase-live.sh -- kagami test --scope NetKitPocketLiveTests --strict
+      - scripts/pocketbase-live.sh -- kagami test --all --strict
 
   # The whole package (NetKit and NetKitApple) for the iOS Simulator. Derived data and the package checkouts live
   # inside the workspace, so nothing is written to ~/Library/Developer. Simulator builds need no signing.
