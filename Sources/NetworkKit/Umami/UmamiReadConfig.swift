@@ -41,8 +41,7 @@ public enum UmamiReadConfigError: Error, Equatable, Sendable, CustomStringConver
 /// `description`, `debugDescription` or the `Mirror` of this type, so a log line
 /// that prints the config cannot leak it.
 public struct UmamiReadConfig: Sendable, CustomStringConvertible, CustomDebugStringConvertible,
-  CustomReflectable
-{
+  CustomReflectable {
 
   public let scheme: String
   public let host: String
@@ -84,6 +83,7 @@ public struct UmamiReadConfig: Sendable, CustomStringConvertible, CustomDebugStr
   public var description: String {
     "UmamiReadConfig(\(scheme)://\(host), websiteId: \(websiteId), token: <redacted>)"
   }
+
   public var debugDescription: String { description }
   public var customMirror: Mirror {
     Mirror(
