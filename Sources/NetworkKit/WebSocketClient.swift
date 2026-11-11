@@ -4,6 +4,9 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Actor-based WebSocket client with automatic reconnection.
 ///
@@ -150,7 +153,11 @@ public actor WebSocketClient {
                 reconnectAttempt += 1
                 let delay = reconnectDelay * Double(reconnectAttempt)
                 Task {
-                    try? await Task.sleep(for: .seconds(delay))
+                    do {
+                        try await Task.sleep(for: .seconds(delay))
+                    } catch {
+                        return // cancelled while waiting: do not reconnect
+                    }
                     guard !self.isIntentionalDisconnect else { return }
                     self.startTask()
                 }

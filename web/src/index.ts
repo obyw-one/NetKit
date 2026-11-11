@@ -1,11 +1,11 @@
 /**
  * index.ts — NetKit Web public API
  *
- * Re-exports every public symbol from @fj-studios/netkit-web.
+ * Re-exports every public symbol from @obyw-one/netkit-web.
  * Import granularly for tree-shaking:
  *
- *   import { HTTPClient } from "@fj-studios/netkit-web";
- *   import type { EndPoint } from "@fj-studios/netkit-web";
+ *   import { HTTPClient } from "@obyw-one/netkit-web";
+ *   import type { EndPoint } from "@obyw-one/netkit-web";
  */
 
 // NetworkError — discriminated union, mirrors Swift NetworkError enum

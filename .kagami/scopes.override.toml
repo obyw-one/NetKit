@@ -18,6 +18,30 @@ test_target_name = "NetKitTests"
 module_patterns = ["NetKitTests"]
 type_patterns = ["ContentDirectoryTests", "DIDLLiteTests", "DIDLParsingTests", "DLNATests", "DeviceDescriptionTests", "EndPointTests", "MediaItemTests", "MockNetworkServiceTests", "NetworkServiceTests", "SOAPTests", "SSDPParsingTests", "SSDPSearchResponderTests", "SSDPSerializationTests", "SidecarMetadataTests", "UmamiAnswerTests", "UmamiAnswerAcceptanceTests", "UmamiEndPointTests", "UmamiEndPointNameTests", "UmamiTrackUseCaseTests", "UmamiReadClientTests", "URLSessionS3TransportTests"]
 test_file_patterns = ["**/NetworkKitTests/DLNATests.swift", "**/NetworkKitTests/EndPointTests.swift", "**/NetworkKitTests/MockNetworkServiceTests.swift", "**/NetworkKitTests/NetworkServiceTests.swift", "**/NetworkKitTests/UmamiAnswerTests.swift", "**/NetworkKitTests/UmamiEndPointTests.swift", "**/NetworkKitTests/UmamiTrackUseCaseTests.swift", "**/NetworkKitTests/UmamiReadClientTests.swift", "**/NetworkKitTests/ObjectStore/URLSessionS3TransportTests.swift"]
-expected_test_min = 108
+expected_test_min = 117
 timeout_seconds = 600
 description = "NetKit — the umami wire contract (config validation, endpoint body, UmamiAnswer acceptance) plus DLNA/SSDP and the NetworkService seam."
+
+[[scopes]]
+name = "NetKitPocketTests"
+language = "swift"
+package_path = "."
+test_target_name = "NetKitTests"
+module_patterns = ["NetKitTests"]
+type_patterns = ["PocketConfigTests", "PocketWireTests", "PocketListContainerTests", "PocketAuthResponseTests", "PocketErrorBodyTests", "PocketPayloadTests", "PocketQueryTests", "PocketClientTests", "PocketClientErrorTests", "PocketParityTests", "PocketDateTests", "PocketConfigEndpointTests"]
+test_file_patterns = ["**/NetworkKitTests/Pocket/*.swift"]
+expected_test_min = 140
+timeout_seconds = 600
+description = "NetKit PocketBase client, offline: config validation, the wire contract of every PocketEndPoint case, every call and every error path, the unset-date reader and parity with the legacy app-level endpoints. Stubbed transport only (MockPocketTransport) — nothing here touches a network."
+
+[[scopes]]
+name = "NetKitPocketLiveTests"
+language = "swift"
+package_path = "."
+test_target_name = "NetKitTests"
+module_patterns = ["NetKitTests"]
+type_patterns = ["PocketLiveTests", "PocketConfigLiveTests"]
+test_file_patterns = ["**/NetworkKitTests/PocketLive/*.swift"]
+expected_test_min = 23
+timeout_seconds = 900
+description = "NetKit PocketClient against a REAL throwaway PocketBase (podman). Run it as `scripts/pocketbase-live.sh -- kagami test --scope NetKitPocketLiveTests --strict`. Without the script the tests FAIL by design (they never skip: kagami counts skipped rows toward the floor and exits 0 on an all-skipped scope)."

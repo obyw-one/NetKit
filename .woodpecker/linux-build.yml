@@ -1,0 +1,44 @@
+# .woodpecker/linux-build.yml — prove NetKit's core builds AND passes its tests on Linux
+#
+# NetKit is split like CoreKit/CoreKitUI: the `NetKit` product (EndPoint, NetworkProtocol, Umami, PocketBase,
+# the config endpoint, WebSocket) is platform-neutral and must build with ZERO Apple framework; the
+# `NetKitApple` product (DLNA/SSDP, NetworkMonitor, the Combine publisher) wraps every source in
+# `#if canImport(Network)` / `canImport(Combine)`, so it is an empty module here and `swift build` still
+# covers the whole package. Model: BackendKit's and CoreKit's .woodpecker/linux-build.yml.
+#
+# No step below sets an `environment:` value built from a path. If one is ever needed, compute it at runtime
+# in `commands:` with `$$` (e.g. `export X=$$(pwd)/...`): `${CI_WORKSPACE}` is EMPTY when Woodpecker parses the
+# file, so a path baked into `environment:` silently points at the filesystem root.
+
+when:
+  event: [pull_request, push, manual]  # manual = the "Exécuter un pipeline" button (operator-triggered run)
+  branch: [develop, "epic/*", "feat/*", "fix/*", "agent/*", "story/*"]
+
+# A Linux gate must run on a Linux Docker agent. Without a platform label, any connected agent is eligible,
+# whatever its OS or backend.
+labels:
+  platform: linux/amd64
+
+variables:
+  - &swift_image "swift:6.3-jammy"  # Docker Hub official Linux stable; NetKit is swift-tools 6.0, within range
+
+steps:
+  linux-build:
+    image: *swift_image
+    commands:
+      - swift --version
+      - swift build --build-tests   # every target AND every test target, so the test code is compiled on Linux too
+
+  # Compiling is not working: the whole suite runs here too.
+  #
+  # Direct SwiftPM on purpose, the one exception to "kagami only": kagami has no Linux path yet
+  # (macOS-only tool, private dependencies; spec 4965545a). Replace this step with kagami once it does.
+  #
+  # The live PocketBase suites (PocketLiveTests, PocketConfigLiveTests) need a throwaway PocketBase started by
+  # scripts/pocketbase-live.sh. They FAIL without it by design (they never skip), so they are excluded here and
+  # this pipeline proves the build plus the offline suites; the live round trip runs in the macOS gate. The DLNA
+  # tests are compiled out on Linux (`#if canImport(Network)`).
+  linux-test:
+    image: *swift_image
+    commands:
+      - swift test --skip-build --skip PocketLiveTests --skip PocketConfigLiveTests

@@ -7,8 +7,10 @@
 
 import Foundation
 import Testing
-
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Suite("UmamiEndPoint")
 struct UmamiEndPointTests {
@@ -59,7 +61,7 @@ struct UmamiEndPointTests {
     let endPoint = UmamiEndPoint.track(config: config, url: "/cli", title: "shikki.verb.exit")
     let service = NetworkService()
 
-    let request = service.createRequest(endPoint: endPoint)
+    let request = try service.createRequest(endPoint: endPoint)
 
     #expect(request.httpMethod == "POST")
     #expect(request.url?.scheme == "https")
@@ -79,7 +81,7 @@ struct UmamiEndPointTests {
     let endPoint = UmamiEndPoint.track(config: config, url: "/cli", title: "shikki.verb.exit")
     let service = NetworkService()
 
-    let request = service.createRequest(endPoint: endPoint)
+    let request = try service.createRequest(endPoint: endPoint)
 
     #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer secret-token")
   }

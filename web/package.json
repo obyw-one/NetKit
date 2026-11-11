@@ -1,7 +1,7 @@
 {
-  "name": "@fj-studios/netkit-web",
+  "name": "@obyw-one/netkit-web",
   "version": "0.1.0",
-  "description": "TypeScript HTTP and WebSocket networking — TS sibling of FJ-Studios/NetKit (Swift)",
+  "description": "TypeScript HTTP and WebSocket networking — TS sibling of obyw-one/NetKit (Swift)",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -29,11 +29,11 @@
     "websocket",
     "fetch",
     "typescript",
-    "fj-studios",
+    "obyw-one",
     "netkit"
   ],
-  "author": "FJ-Studios",
-  "license": "MIT",
+  "author": "OBYW.one",
+  "license": "Apache-2.0",
   "devDependencies": {
     "@rollup/plugin-typescript": "^11.1.6",
     "@vitest/coverage-v8": "^2.1.8",

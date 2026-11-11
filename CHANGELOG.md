@@ -5,7 +5,68 @@ All notable changes to NetKit are documented here. This project follows
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-11-11
+
+One release for the four PRs merged since 2.4.0: the PocketBase client and config
+endpoint with the Linux split (#18), `URLSessionS3Transport` (#20), the umami read
+endpoints (#21) and the Apache-2.0 relicence (#19).
+
+**Major, because it breaks source:** `NetworkProtocol.createRequest(endPoint:)` now
+throws and `NetworkError` gains two cases (see "`createRequest` no longer crashes"),
+and DLNA / SSDP / `NetworkMonitor` / the Combine `sendRequest` move to the new
+`NetKitApple` product (see "Linux and the `NetKitApple` split"). A consumer on
+`from: "2.x"` does not pick this up by itself; each change below says what to edit.
+
 ### Added
+
+- **`PocketEndPoint` and `PocketClient` — a generic PocketBase client, beside
+  `UmamiEndPoint`.** Records (list with filter / sort / expand / fields /
+  `skipTotal`, view, create, update, delete), password login, token refresh,
+  password reset (request + confirm) and custom routes, over an injected
+  `PocketConfig` and `PocketTransport`.
+
+  - **No default URL.** `PocketConfig` is validated at construction; a missing
+    endpoint is `PocketConfigError.missingEndpoint`, never a fallback. It is not
+    `Codable` (it can hold a credential) and redacts it from its descriptions.
+  - **One typed error, with the server's own body.** `PocketError` keeps
+    PocketBase's `{status, message, data}` error body and the raw bytes.
+    `NetworkProtocol.sendRequest` cannot do this: it throws on a non-2xx status
+    before returning the body. 401/403, and a 400 from a login or refresh, are
+    `.authentication`. Nothing is swallowed.
+  - **Typed models only.** `PocketListContainer`, `PocketAuthResponse`,
+    `PocketErrorBody`, `PocketPayload` (over `CoreKit.JSONValue`),
+    `PocketQuery`. PocketBase dates go through the fleet strategy.
+  - **`PocketFilter.literal(_:)`** for a safe filter value. Interpolating a raw
+    value is a filter injection (measured: `x' || title != '` matches every
+    record). A backslash is refused: PocketBase 0.25.9 and 0.40.6 disagree on
+    what it means.
+  - **`decodePocketDateIfPresent(forKey:)`.** PocketBase serialises an unset
+    date as `""`, which the fleet date strategy rejects, so a plain `Date?`
+    fails the whole record.
+  - **`MockPocketTransport`**, a scripted actor for tests of anything built on
+    the client. A request with no queued reply fails loudly.
+  - `PocketEndPoint` is also an `EndPoint`, so a consumer that calls
+    `networkService.sendRequest(endpoint:)` keeps that call shape.
+
+  Requests are built without `NetworkProtocol.createRequest`'s hazards: path
+  segments and query values are percent-encoded, `..` and empty segments are
+  refused, bodies carry `Content-Type: application/json` (the shared builder
+  sends none, so URLSession labels the JSON `application/x-www-form-urlencoded`
+  and PocketBase answers "Cannot be blank"), and an update is a PATCH (PocketBase
+  has no PUT route for records: it answers 404).
+
+  Verified against a real PocketBase (0.25.9, then 0.40.6) started by
+  `scripts/pocketbase-live.sh -- kagami test --all --strict`.
+
+- **`PocketConfigEndpoint` — CoreKit's `ConfigEndpoint` over PocketBase.**
+  Fetches the server-driven `AppConfig` from a PocketBase collection (one
+  record per app and environment, filtered with `PocketFilter.literal`),
+  decoding `PocketListContainer<AppConfig>` from the snake_case record, throwing
+  `ConfigEndpointError.notFound` when there is none and every other failure
+  unchanged as a `PocketError`. The collection is injected; the bearer token is
+  asked for on each fetch, so a refreshed login is picked up. Runs CoreKit's
+  `ConfigEndpointConformance` over a fake server (offline) and over a real
+  PocketBase 0.25.9 (live scope), and drives CoreKit's `AppConfigService`.
 
 - **`URLSessionS3Transport`** — the `URLSession` transport for CoreKit's
   `S3ObjectStoreClient`, moved here from CoreKit (spec d3f8a1b2). CoreKit keeps
@@ -13,18 +74,7 @@ All notable changes to NetKit are documented here. This project follows
   transport; the caller injects this one. Its two ends are pure functions
   (`urlRequest(for:)`, `response(data:response:operation:)`) and the loader is
   injected, so it is tested by return value, not by intercepting the network.
-  New public type: next release is minor (2.6.0).
-
-### Changed
-
-- **CoreKit floor: 0.16.0**, the first CoreKit release that no longer declares
-  its own `URLSessionS3Transport` (0.14/0.15 would make the name ambiguous).
-
-## [2.5.0] — 2026-11-11
-
-Additive only: no existing API changes.
-
-### Added
+  New public type.
 
 - **The umami READ endpoints**, extracted from the standalone UmamiKit
   (`shikki-io/UmamiKit`, which has no consumer and cannot build outside one
@@ -52,11 +102,104 @@ kit's job.
 
 ### Changed
 
+- **CoreKit is `https://github.com/obyw-one/CoreKit.git` from `0.16.0`** (was the
+  `FJ-Studios` URL from `0.1.0`). `ConfigEndpoint` and its conformance suite shipped
+  in 0.14.0; 0.16.0 is the first release without CoreKit's own
+  `URLSessionS3Transport`. The test target gains `CoreKitTestSupport`. The one
+  caller of the deprecated `Data.prettyJson` (a debug log line) now uses
+  `prettyJSON()`.
+- **Platforms: visionOS 1 added.** Whatever builds for iOS builds for visionOS;
+  the macOS gate builds the package for macOS and the visionOS Simulator too.
+- **Dispatch queue labels are `one.obyw.netkit.*`** (were `net.netkit.*`), from one
+  `NetKitQueueLabel` enum instead of five literals.
+- **The TypeScript sibling is `@obyw-one/netkit-web`, Apache-2.0** (was
+  `@fj-studios/netkit-web`, MIT; never published under either name).
+- **The macOS gate is one `kagami test --all --strict`** under
+  `scripts/pocketbase-live.sh`, which now runs the official PocketBase binary
+  (default 0.40.6, checksum-pinned) with no container and no system temp
+  directory.
 - **`UmamiEndPoint` and `UmamiReadEndPoint` are checked `Sendable`**, no longer
   `@unchecked`: every associated value is `Sendable`, so the compiler now proves it
   instead of being told to skip the check.
 - **Licence: Apache-2.0** (was AGPL-3.0, #19). Libraries other people link are
   Apache-2.0; the copyright holder is OBYW.one SASU. See `NOTICE`.
+
+### `createRequest` no longer crashes or drops a body (API change)
+
+`NetworkProtocol.createRequest(endPoint:)` is now `throws(NetworkError)`.
+
+- Before: a host/path that forms no URL hit `preconditionFailure` and crashed the
+  app at runtime (nothing forces an endpoint to be well formed: the protocol has a
+  default implementation), and a body that failed to encode was `try?`'d away, so the
+  request went out WITHOUT its body. That is how a PocketBase login got a 400 "Cannot
+  be blank" with no local error.
+- Now: `NetworkError.invalidURL(description:)` names scheme, host and path (never the
+  query), and `NetworkError.bodyEncodingFailed(_:)` carries the cause. A body that
+  `JSONSerialization` would raise an Objective-C exception for (a `Date`, `NaN`) is
+  checked first and reported the same way, instead of crashing. Nothing is sent.
+- Every caller propagates it: the `async` and closure `sendRequest` (the closure gets
+  `.failure`), `MockNetworkService` (nothing is captured), the Combine publisher
+  (`Fail`), and so the Umami use case (`TrackUseCaseError.networkError`).
+- `WebSocketClient`'s reconnect no longer reconnects after its sleep is cancelled.
+
+**API break, listed:**
+1. A direct caller of `createRequest(endPoint:)` must now write `try`.
+2. `NetworkError` gains two cases (`invalidURL`, `bodyEncodingFailed`), so an
+   exhaustive `switch` over it needs them (or a `default`).
+3. An external conformer that implemented the old non-throwing `createRequest` still
+   compiles (a non-throwing function satisfies a throwing requirement) but keeps
+   its old behaviour; only the default implementation changed.
+
+### Linux and the `NetKitApple` split
+
+NetKit now builds on Linux. The Apple-only code moved to a second product,
+**`NetKitApple`** (the way CoreKit keeps `CoreKitUI` apart): DLNA / SSDP
+(`DLNABrowser`, `DLNAServer`, `SSDPAdvertiser`, `SSDPSearchResponder`,
+`SSDPBrowser`, `ContentDirectory`, `DLNAMediaItem`, `SSDPMessage`),
+`NetworkMonitor`, and the Combine publisher form of `sendRequest`. Every source
+is wrapped in `#if canImport(Network)` / `canImport(Combine)`, so the module is
+empty off Apple. The `NetKit` product (EndPoint, `NetworkProtocol`,
+`NetworkService`, `MockNetworkService`, Umami, PocketBase, the config endpoint,
+WebSocket) is platform-neutral. `.woodpecker/linux-build.yml` runs the build and
+the offline suites on `swift:6.3-jammy`.
+
+**What changes for an Apple consumer**
+
+- Using DLNA, SSDP or `NetworkMonitor`: add the `NetKitApple` product to the
+  target's dependencies and `import NetKitApple` (no other source change).
+- Using the Combine form `sendRequest(endpoint:type:) -> AnyPublisher`: it is no
+  longer a `NetworkProtocol` requirement but an extension in `NetKitApple`;
+  `import NetKitApple`. A custom conformer that implemented it keeps compiling
+  (it is now an ordinary method), but a call through `any NetworkProtocol` runs
+  the extension's URLSession implementation.
+- `DLNAServer.onReady` is now `@Sendable` (it is called from the server's queue).
+- Added: `MockNetworkService.response(for:)`, `ContentDirectory.isEmpty`.
+- Everything else is source-compatible.
+
+### Concurrency
+
+No `@unchecked Sendable` remains in `Sources/`.
+
+- `MockNetworkService`, `ContentDirectory`, `SSDPAdvertiser`,
+  `SSDPSearchResponder`, `SSDPBrowser`, `DLNABrowser`, `DLNAServer`: mutable
+  state is one value behind the platform's own Sendable lock
+  (`OSAllocatedUnfairLock`; `Synchronization.Mutex` off Apple for the mock), so
+  the compiler checks the claim. Delegates and callbacks are called outside the
+  lock. These classes were racy before: `start()`, `stop()`, `servers` and `port`
+  touched state from the caller's thread while the Network callbacks wrote it on
+  a queue. Restarting now cancels the previous connection or listener instead of
+  leaking it.
+- `DLNAServer.ChunkState` is gone: the byte count left to send travels by value
+  through each chunk's completion handler.
+- `UmamiEndPoint` never needed `@unchecked`: its payload is `UmamiConfig` and
+  `[String: String]`, both Sendable.
+
+### Notes
+
+- `EndPoint.swift`, `WebSocketClient.swift` and the tests import
+  `FoundationNetworking` where `URLRequest` is used.
+- The PocketBase files and the whole core build and pass their offline tests on
+  Linux (Swift 6.3).
 
 ## [2.4.0] — 2026-10-28
 

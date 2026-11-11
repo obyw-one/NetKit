@@ -1,3 +1,4 @@
+#if canImport(Network)
 import Foundation
 
 /// SSDP multicast address and port.
@@ -177,3 +178,4 @@ extension SSDPMessage {
         return Data(message.utf8)
     }
 }
+#endif

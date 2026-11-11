@@ -3,10 +3,12 @@
 //  NetworkKitTests
 //
 
-import Combine
 import Foundation
 import Testing
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // MARK: - Test Model
 
@@ -15,19 +17,43 @@ private struct User: Codable, Equatable, Sendable {
     let name: String
 }
 
-private struct MockEndPoint: EndPoint, @unchecked Sendable {
+private struct MockEndPoint: EndPoint {
     var host: String = "api.example.com"
     var path: String = "/users/1"
     var method: RequestMethod = .GET
-    var header: [String: String]? = nil
-    var body: [String: Any]? = nil
-    var queryParams: [String: Any]? = nil
+    var header: [String: String]?
+    var body: [String: Any]? { nil }
+    var queryParams: [String: Any]? { nil }
 }
 
 // MARK: - Tests
 
 @Suite("MockNetworkService Tests")
 struct MockNetworkServiceTests {
+
+    @Test("test_mock_concurrentRequestsAndConfiguration_loseNothing")
+    func test_mock_concurrentRequestsAndConfiguration_loseNothing() async throws {
+        // Many tasks configure and call the mock at once. With the state behind its lock every
+        // request is captured exactly once and no write is torn; run under the thread
+        // sanitizer this is also the race detector for the Sendable claim.
+        let mock = MockNetworkService()
+        mock.resultData = try JSONEncoder().encode(User(id: 1, name: "Alice"))
+        let calls = 200
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for index in 0..<calls {
+                group.addTask {
+                    mock.statusCode = 200 + (index % 2)
+                    let user: User = try await mock.sendRequest(endpoint: MockEndPoint())
+                    #expect(user.name == "Alice")
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        #expect(mock.capturedRequests.count == calls)
+        #expect([200, 201].contains(mock.statusCode))
+    }
 
     @Test("Returns decoded model from configured data")
     func returnsDecodedModel() async throws {

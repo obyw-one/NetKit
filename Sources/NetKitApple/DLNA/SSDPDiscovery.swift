@@ -1,5 +1,7 @@
+#if canImport(Network)
 import Foundation
 import Network
+import os
 
 /// Delegate for SSDP device discovery events.
 public protocol SSDPDelegate: AnyObject, Sendable {
@@ -10,15 +12,24 @@ public protocol SSDPDelegate: AnyObject, Sendable {
 // MARK: - SSDPAdvertiser
 
 /// Advertises a UPnP device on the local network via SSDP NOTIFY multicast.
-public final class SSDPAdvertiser: @unchecked Sendable {
+///
+/// `Sendable` without `@unchecked`: the connection and the timer are the only
+/// mutable state, they live in one value behind an `OSAllocatedUnfairLock`, and
+/// `start()` / `stop()` may be called from any thread. The Network framework's
+/// callbacks run on `queue`; they never hold the lock while calling out.
+public final class SSDPAdvertiser: Sendable {
+    private struct State {
+        var connection: NWConnection?
+        var aliveTimer: DispatchSourceTimer?
+    }
+
     private let location: String
     private let usn: String
     private let server: String
     private let deviceType: String
 
-    private var connection: NWConnection?
-    private var aliveTimer: DispatchSourceTimer?
-    private let queue = DispatchQueue(label: "net.netkit.ssdp.advertiser")
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let queue = NetKitQueueLabel.ssdpAdvertiser.makeQueue()
 
     public init(
         location: String,
@@ -42,7 +53,12 @@ public final class SSDPAdvertiser: @unchecked Sendable {
         params.allowLocalEndpointReuse = true
 
         let conn = NWConnection(host: host, port: port, using: params)
-        self.connection = conn
+        let previous = state.withLock { state -> NWConnection? in
+            let old = state.connection
+            state.connection = conn
+            return old
+        }
+        previous?.cancel()
 
         conn.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
@@ -56,20 +72,23 @@ public final class SSDPAdvertiser: @unchecked Sendable {
 
     /// Stop advertising — sends NOTIFY byebye and tears down the connection.
     public func stop() {
-        aliveTimer?.cancel()
-        aliveTimer = nil
+        let (timer, conn) = state.withLock { state -> (DispatchSourceTimer?, NWConnection?) in
+            let taken = (state.aliveTimer, state.connection)
+            state.aliveTimer = nil
+            state.connection = nil
+            return taken
+        }
+        timer?.cancel()
 
-        if let conn = connection, conn.state == .ready {
+        if let conn, conn.state == .ready {
             let byebye = SSDPMessage.notifyByebye(usn: usn, searchTarget: deviceType)
             conn.send(content: byebye, completion: .contentProcessed { _ in })
         }
-
-        connection?.cancel()
-        connection = nil
+        conn?.cancel()
     }
 
     private func sendAlive() {
-        guard let conn = connection else { return }
+        guard let conn = state.withLock({ $0.connection }) else { return }
         let data = SSDPMessage.notifyAlive(
             location: location,
             usn: usn,
@@ -95,7 +114,12 @@ public final class SSDPAdvertiser: @unchecked Sendable {
             self?.sendAlive()
         }
         timer.resume()
-        aliveTimer = timer
+        let previous = state.withLock { state -> DispatchSourceTimer? in
+            let old = state.aliveTimer
+            state.aliveTimer = timer
+            return old
+        }
+        previous?.cancel()
     }
 }
 
@@ -103,14 +127,14 @@ public final class SSDPAdvertiser: @unchecked Sendable {
 
 /// Listens for M-SEARCH requests on the SSDP multicast group and replies with unicast responses.
 /// Used by `DLNAServer` so that browsers (iPad/VLC/etc.) can discover the server on demand.
-public final class SSDPSearchResponder: @unchecked Sendable {
+public final class SSDPSearchResponder: Sendable {
     private let location: String
     private let usn: String
     private let server: String
     private let deviceType: String
 
-    private var listener: NWListener?
-    private let queue = DispatchQueue(label: "net.netkit.ssdp.searchResponder")
+    private let listener = OSAllocatedUnfairLock<NWListener?>(initialState: nil)
+    private let queue = NetKitQueueLabel.ssdpSearchResponder.makeQueue()
 
     public init(
         location: String,
@@ -129,21 +153,30 @@ public final class SSDPSearchResponder: @unchecked Sendable {
         let params = NWParameters.udp
         params.allowLocalEndpointReuse = true
 
-        guard let listener = try? NWListener(using: params, on: NWEndpoint.Port(rawValue: SSDPConstants.multicastPort)!) else {
+        guard let newListener = try? NWListener(using: params, on: NWEndpoint.Port(rawValue: SSDPConstants.multicastPort)!) else {
             return
         }
-        self.listener = listener
+        let previous = listener.withLock { current -> NWListener? in
+            let old = current
+            current = newListener
+            return old
+        }
+        previous?.cancel()
 
-        listener.newConnectionHandler = { [weak self] connection in
+        newListener.newConnectionHandler = { [weak self] connection in
             self?.handleConnection(connection)
         }
-        listener.start(queue: queue)
+        newListener.start(queue: queue)
     }
 
     /// Stop listening.
     public func stop() {
-        listener?.cancel()
-        listener = nil
+        let current = listener.withLock { current -> NWListener? in
+            let old = current
+            current = nil
+            return old
+        }
+        current?.cancel()
     }
 
     private func handleConnection(_ connection: NWConnection) {
@@ -181,14 +214,27 @@ public final class SSDPSearchResponder: @unchecked Sendable {
 /// Uses NWConnectionGroup to join the SSDP multicast group (239.255.255.250:1900)
 /// so we receive both NOTIFY announcements AND unicast M-SEARCH responses.
 /// NWListener alone cannot receive multicast traffic.
-public final class SSDPBrowser: @unchecked Sendable {
-    public weak var delegate: SSDPDelegate?
+///
+/// `Sendable` without `@unchecked`: the group, the search connection, the set of
+/// known USNs and the delegate are one value behind an `OSAllocatedUnfairLock`.
+/// The delegate is called OUTSIDE the lock, on `queue`.
+public final class SSDPBrowser: Sendable {
+    private struct State {
+        var multicastGroup: NWConnectionGroup?
+        var searchConnection: NWConnection?
+        var discoveredUSNs: Set<String> = []
+        weak var delegate: SSDPDelegate?
+    }
 
     private let searchTarget: String
-    private var multicastGroup: NWConnectionGroup?
-    private var searchConnection: NWConnection?
-    private var discoveredUSNs: Set<String> = []
-    private let queue = DispatchQueue(label: "net.netkit.ssdp.browser")
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let queue = NetKitQueueLabel.ssdpBrowser.makeQueue()
+
+    /// Notified of discovered and lost devices, on the browser's queue.
+    public var delegate: SSDPDelegate? {
+        get { state.withLock { $0.delegate } }
+        set { state.withLock { $0.delegate = newValue } }
+    }
 
     public init(searchTarget: String = SSDPConstants.mediaServerType) {
         self.searchTarget = searchTarget
@@ -202,11 +248,15 @@ public final class SSDPBrowser: @unchecked Sendable {
 
     /// Stop browsing.
     public func stop() {
-        multicastGroup?.cancel()
-        multicastGroup = nil
-        searchConnection?.cancel()
-        searchConnection = nil
-        discoveredUSNs.removeAll()
+        let (group, conn) = state.withLock { state -> (NWConnectionGroup?, NWConnection?) in
+            let taken = (state.multicastGroup, state.searchConnection)
+            state.multicastGroup = nil
+            state.searchConnection = nil
+            state.discoveredUSNs.removeAll()
+            return taken
+        }
+        group?.cancel()
+        conn?.cancel()
     }
 
     /// Send an M-SEARCH request to discover devices.
@@ -218,11 +268,14 @@ public final class SSDPBrowser: @unchecked Sendable {
         let params = NWParameters.udp
         params.allowLocalEndpointReuse = true
 
-        // Close previous search connection
-        searchConnection?.cancel()
-
         let conn = NWConnection(host: host, port: port, using: params)
-        searchConnection = conn
+        // Close the previous search connection
+        let previous = state.withLock { state -> NWConnection? in
+            let old = state.searchConnection
+            state.searchConnection = conn
+            return old
+        }
+        previous?.cancel()
 
         conn.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
@@ -258,14 +311,19 @@ public final class SSDPBrowser: @unchecked Sendable {
         params.allowLocalEndpointReuse = true
 
         let group = NWConnectionGroup(with: groupDesc, using: params)
-        self.multicastGroup = group
+        let previous = state.withLock { state -> NWConnectionGroup? in
+            let old = state.multicastGroup
+            state.multicastGroup = group
+            return old
+        }
+        previous?.cancel()
 
-        group.setReceiveHandler(maximumMessageSize: 65536, rejectOversizedMessages: true) { [weak self] message, data, isComplete in
+        group.setReceiveHandler(maximumMessageSize: 65536, rejectOversizedMessages: true) { [weak self] _, data, _ in
             guard let self, let data else { return }
             self.handleSSDPData(data)
         }
 
-        group.stateUpdateHandler = { state in
+        group.stateUpdateHandler = { _ in
             // NWConnectionGroup state changes — no action needed
         }
 
@@ -279,16 +337,22 @@ public final class SSDPBrowser: @unchecked Sendable {
             guard let self else { return }
             switch message.type {
             case .alive, .searchResponse:
-                let isNew = self.discoveredUSNs.insert(message.usn).inserted
+                let (isNew, delegate) = self.state.withLock { state in
+                    (state.discoveredUSNs.insert(message.usn).inserted, state.delegate)
+                }
                 if isNew {
-                    self.delegate?.ssdpDidDiscover(message: message)
+                    delegate?.ssdpDidDiscover(message: message)
                 }
             case .byebye:
-                self.discoveredUSNs.remove(message.usn)
-                self.delegate?.ssdpDidLose(usn: message.usn)
+                let delegate = self.state.withLock { state -> SSDPDelegate? in
+                    state.discoveredUSNs.remove(message.usn)
+                    return state.delegate
+                }
+                delegate?.ssdpDidLose(usn: message.usn)
             case .search:
                 break // We don't respond to searches as a browser
             }
         }
     }
 }
+#endif

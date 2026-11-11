@@ -1,3 +1,4 @@
+#if canImport(Network)
 //
 //  NetworkMonitor.swift
 //  NetKit
@@ -72,7 +73,7 @@ public actor NetworkMonitor {
         continuation?.yield(type)
     }
 
-    private nonisolated func mapInterface(_ path: NWPath) -> InterfaceType {
+    nonisolated private func mapInterface(_ path: NWPath) -> InterfaceType {
         if path.usesInterfaceType(.wifi) { return .wifi }
         if path.usesInterfaceType(.cellular) { return .cellular }
         if path.usesInterfaceType(.wiredEthernet) { return .ethernet }
@@ -80,3 +81,4 @@ public actor NetworkMonitor {
         return .unknown
     }
 }
+#endif

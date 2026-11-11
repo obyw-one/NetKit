@@ -1,5 +1,7 @@
+#if canImport(Network)
 import Foundation
 import Network
+import os
 
 /// Delegate for DLNA server discovery events.
 public protocol DLNABrowserDelegate: AnyObject, Sendable {
@@ -8,7 +10,11 @@ public protocol DLNABrowserDelegate: AnyObject, Sendable {
 }
 
 /// Client-side DLNA discovery — finds media servers on the local network and browses their content.
-public final class DLNABrowser: @unchecked Sendable {
+///
+/// `Sendable` without `@unchecked`: the known servers and the delegate are one
+/// value behind an `OSAllocatedUnfairLock`, so `servers` can be read from any
+/// thread while discovery callbacks write it. Delegate calls happen outside the lock.
+public final class DLNABrowser: Sendable {
     /// A discovered DLNA media server.
     public struct DiscoveredServer: Sendable, Equatable, Identifiable {
         public var id: String { usn }
@@ -25,11 +31,20 @@ public final class DLNABrowser: @unchecked Sendable {
         }
     }
 
-    public weak var delegate: DLNABrowserDelegate?
+    private struct State {
+        var discoveredServers: [String: DiscoveredServer] = [:]
+        weak var delegate: DLNABrowserDelegate?
+    }
 
     private let ssdpBrowser = SSDPBrowser(searchTarget: SSDPConstants.mediaServerType)
-    private var discoveredServers: [String: DiscoveredServer] = [:]
-    private let queue = DispatchQueue(label: "net.netkit.dlna.browser")
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let queue = NetKitQueueLabel.dlnaBrowser.makeQueue()
+
+    /// Notified of discovered and lost servers, on the browser's queue.
+    public var delegate: DLNABrowserDelegate? {
+        get { state.withLock { $0.delegate } }
+        set { state.withLock { $0.delegate = newValue } }
+    }
 
     public init() {}
 
@@ -42,12 +57,12 @@ public final class DLNABrowser: @unchecked Sendable {
     /// Stop discovering.
     public func stop() {
         ssdpBrowser.stop()
-        discoveredServers.removeAll()
+        state.withLock { $0.discoveredServers.removeAll() }
     }
 
     /// Currently known servers.
     public var servers: [DiscoveredServer] {
-        Array(discoveredServers.values)
+        state.withLock { Array($0.discoveredServers.values) }
     }
 
     /// Refresh — send another M-SEARCH.
@@ -132,7 +147,8 @@ public final class DLNABrowser: @unchecked Sendable {
 
     private func extractXMLValue(from xml: String, tag: String) -> String? {
         guard let startRange = xml.range(of: "<\(tag)>"),
-              let endRange = xml.range(of: "</\(tag)>") else { return nil }
+              let endRange = xml.range(of: "</\(tag)>")
+        else { return nil }
         let valueStart = startRange.upperBound
         let valueEnd = endRange.lowerBound
         guard valueStart < valueEnd else { return nil }
@@ -143,7 +159,8 @@ public final class DLNABrowser: @unchecked Sendable {
     static func parseDidlLiteFromSOAP(_ soap: String) -> [DLNAMediaItem] {
         // Extract the Result element (contains XML-escaped DIDL-Lite)
         guard let resultStart = soap.range(of: "<Result>"),
-              let resultEnd = soap.range(of: "</Result>") else { return [] }
+              let resultEnd = soap.range(of: "</Result>")
+        else { return [] }
 
         var didl = String(soap[resultStart.upperBound..<resultEnd.lowerBound])
         // Unescape XML entities
@@ -237,7 +254,8 @@ public final class DLNABrowser: @unchecked Sendable {
 
     static func parseEntriesFromSOAP(_ soap: String) -> DLNABrowseEntries {
         guard let resultStart = soap.range(of: "<Result>"),
-              let resultEnd = soap.range(of: "</Result>") else {
+              let resultEnd = soap.range(of: "</Result>")
+        else {
             return DLNABrowseEntries(containers: [], items: [])
         }
         var didl = String(soap[resultStart.upperBound..<resultEnd.lowerBound])
@@ -264,7 +282,8 @@ public final class DLNABrowser: @unchecked Sendable {
 
     private static func parseSingleContainer(_ xml: String) -> DLNAContainer? {
         guard let idRange = xml.range(of: "id=\""),
-              let idEnd = xml.range(of: "\"", range: idRange.upperBound..<xml.endIndex) else { return nil }
+              let idEnd = xml.range(of: "\"", range: idRange.upperBound..<xml.endIndex)
+        else { return nil }
         let id = String(xml[idRange.upperBound..<idEnd.lowerBound])
         let title = extractTag(from: xml, tag: "dc:title") ?? "Folder"
         var childCount: Int?
@@ -277,7 +296,8 @@ public final class DLNABrowser: @unchecked Sendable {
     private static func parseSingleItem(_ xml: String) -> DLNAMediaItem? {
         // Extract id attribute
         guard let idRange = xml.range(of: "id=\""),
-              let idEnd = xml.range(of: "\"", range: idRange.upperBound..<xml.endIndex) else { return nil }
+              let idEnd = xml.range(of: "\"", range: idRange.upperBound..<xml.endIndex)
+        else { return nil }
         let id = String(xml[idRange.upperBound..<idEnd.lowerBound])
 
         // Extract title
@@ -337,12 +357,10 @@ public final class DLNABrowser: @unchecked Sendable {
     }
 
     private static func extractAttribute(from xml: String, element: String, attribute: String) -> String? {
-        guard let elemStart = xml.range(of: "<\(element) ") ?? xml.range(of: "<\(element)\n") else { return nil }
-        guard let elemEnd = xml.range(of: ">", range: elemStart.upperBound..<xml.endIndex) else { return nil }
+        guard let elemStart = xml.range(of: "<\(element) ") ?? xml.range(of: "<\(element)\n"), let elemEnd = xml.range(of: ">", range: elemStart.upperBound..<xml.endIndex) else { return nil }
         let elemHeader = String(xml[elemStart.lowerBound..<elemEnd.upperBound])
 
-        guard let attrStart = elemHeader.range(of: "\(attribute)=\"") else { return nil }
-        guard let attrEnd = elemHeader.range(of: "\"", range: attrStart.upperBound..<elemHeader.endIndex) else { return nil }
+        guard let attrStart = elemHeader.range(of: "\(attribute)=\""), let attrEnd = elemHeader.range(of: "\"", range: attrStart.upperBound..<elemHeader.endIndex) else { return nil }
         return String(elemHeader[attrStart.upperBound..<attrEnd.lowerBound])
     }
 
@@ -362,19 +380,23 @@ extension DLNABrowser: SSDPDelegate {
     public func ssdpDidDiscover(message: SSDPMessage) {
         guard let location = message.location else { return }
 
-        Task {
+        Task { [weak self] in
+            guard let self else { return }
             do {
-                let (name, controlURL) = try await fetchDeviceDescription(location: location)
+                let (name, controlURL) = try await self.fetchDeviceDescription(location: location)
                 let server = DiscoveredServer(
                     usn: message.usn,
                     friendlyName: name,
                     location: location,
                     contentDirectoryURL: controlURL
                 )
-                queue.async { [weak self] in
+                self.queue.async { [weak self] in
                     guard let self else { return }
-                    self.discoveredServers[message.usn] = server
-                    self.delegate?.dlnaBrowser(self, didDiscover: server)
+                    let delegate = self.state.withLock { state -> DLNABrowserDelegate? in
+                        state.discoveredServers[message.usn] = server
+                        return state.delegate
+                    }
+                    delegate?.dlnaBrowser(self, didDiscover: server)
                 }
             } catch {
                 // Silently ignore devices we can't parse
@@ -385,8 +407,11 @@ extension DLNABrowser: SSDPDelegate {
     public func ssdpDidLose(usn: String) {
         queue.async { [weak self] in
             guard let self else { return }
-            self.discoveredServers.removeValue(forKey: usn)
-            self.delegate?.dlnaBrowser(self, didLose: usn)
+            let delegate = self.state.withLock { state -> DLNABrowserDelegate? in
+                state.discoveredServers.removeValue(forKey: usn)
+                return state.delegate
+            }
+            delegate?.dlnaBrowser(self, didLose: usn)
         }
     }
 }
@@ -398,3 +423,4 @@ public enum DLNABrowserError: Error, Sendable {
     case invalidResponse
     case networkError(String)
 }
+#endif

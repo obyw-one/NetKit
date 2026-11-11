@@ -1,10 +1,10 @@
-# @fj-studios/netkit-web
+# @obyw-one/netkit-web
 
-TypeScript HTTP and WebSocket networking — the TS sibling of [FJ-Studios/NetKit](../README.md) (Swift).
+TypeScript HTTP and WebSocket networking — the TS sibling of [obyw-one/NetKit](../README.md) (Swift).
 
 Mirrors the Swift `NetworkKit` surface symbol-for-symbol:
 
-| Swift (NetKit)       | TypeScript (@fj-studios/netkit-web) |
+| Swift (NetKit)       | TypeScript (@obyw-one/netkit-web) |
 |----------------------|-------------------------------------|
 | `EndPoint` protocol  | `EndPoint` interface                |
 | `RequestMethod` enum | `RequestMethod` union               |
@@ -21,7 +21,7 @@ Zero runtime dependencies. ~6 KB gzipped. ES2022 + DOM.
 ## Install
 
 ```bash
-npm install @fj-studios/netkit-web
+npm install @obyw-one/netkit-web
 ```
 
 ---
@@ -31,8 +31,8 @@ npm install @fj-studios/netkit-web
 ### HTTPClient
 
 ```ts
-import { HTTPClient } from "@fj-studios/netkit-web";
-import type { EndPoint } from "@fj-studios/netkit-web";
+import { HTTPClient } from "@obyw-one/netkit-web";
+import type { EndPoint } from "@obyw-one/netkit-web";
 
 // Define an endpoint (implement the EndPoint interface)
 const listUsers: EndPoint = {
@@ -57,8 +57,8 @@ const users = await client.sendRequest<User[]>(listUsers);
 ### EndPoint
 
 ```ts
-import { buildURL, buildRequest } from "@fj-studios/netkit-web";
-import type { EndPoint } from "@fj-studios/netkit-web";
+import { buildURL, buildRequest } from "@obyw-one/netkit-web";
+import type { EndPoint } from "@obyw-one/netkit-web";
 
 const search: EndPoint = {
   host: "api.example.com",
@@ -74,7 +74,7 @@ const url = buildURL(search);
 ### NetworkError
 
 ```ts
-import { NetworkError } from "@fj-studios/netkit-web";
+import { NetworkError } from "@obyw-one/netkit-web";
 
 try {
   await client.sendRequest(endpoint);
@@ -98,7 +98,7 @@ try {
 ### JSONCoder
 
 ```ts
-import { JSONCoder, epochCoder } from "@fj-studios/netkit-web";
+import { JSONCoder, epochCoder } from "@obyw-one/netkit-web";
 
 // Default: iso8601 dates
 const coder = new JSONCoder();
@@ -113,7 +113,7 @@ const ms = epochCoder.encode({ createdAt: new Date() });
 ### WebSocketClient
 
 ```ts
-import { WebSocketClient, WebSocketMessage } from "@fj-studios/netkit-web";
+import { WebSocketClient, WebSocketMessage } from "@obyw-one/netkit-web";
 
 const ws = new WebSocketClient("wss://example.com/ws");
 
@@ -187,6 +187,6 @@ npm run test        # vitest run (83 tests across 6 files)
 
 ## License
 
-MIT — see [LICENSE](../LICENSE) (matches Swift NetKit's license).
+Apache-2.0 — see [LICENSE](../LICENSE) (the same licence as Swift NetKit).
 
 Swift parent docs: [../README.md](../README.md)

@@ -1,6 +1,7 @@
+#if canImport(Network)
 import Foundation
 import Testing
-@testable import NetKit
+@testable import NetKitApple
 
 @Suite("DLNA Module")
 struct DLNATests {
@@ -241,6 +242,29 @@ struct DLNATests {
     @Suite("Content Directory")
     struct ContentDirectoryTests {
 
+        @Test("Concurrent setItems / allItems / browse never tear the item list")
+        func concurrentAccessNeverTearsTheList() async {
+            let directory = ContentDirectory()
+            let small = (0..<3).map { DLNAMediaItem(id: "s\($0)", title: "S\($0)", filePath: "/s\($0).mp4") }
+            let large = (0..<50).map { DLNAMediaItem(id: "l\($0)", title: "L\($0)", filePath: "/l\($0).mp4") }
+
+            await withTaskGroup(of: Void.self) { group in
+                for index in 0..<200 {
+                    group.addTask {
+                        if index % 2 == 0 {
+                            directory.setItems(index % 4 == 0 ? small : large)
+                        } else {
+                            let snapshot = directory.allItems
+                            // Every snapshot is one of the two whole lists, never a mixture.
+                            #expect(snapshot.isEmpty || snapshot.count == small.count || snapshot.count == large.count)
+                            _ = directory.browse(objectID: "0")
+                        }
+                    }
+                }
+            }
+            #expect(directory.count == small.count || directory.count == large.count)
+        }
+
         @Test("Browse root returns all items")
         func browseRoot() {
             let cd = ContentDirectory()
@@ -309,13 +333,13 @@ struct DLNATests {
         @Test("Count reflects setItems")
         func countUpdates() {
             let cd = ContentDirectory()
-            #expect(cd.count == 0)
+            #expect(cd.isEmpty)
 
             cd.setItems([DLNAMediaItem(id: "1", title: "V", filePath: "/v.mp4")])
             #expect(cd.count == 1)
 
             cd.setItems([])
-            #expect(cd.count == 0)
+            #expect(cd.isEmpty)
         }
     }
 
@@ -456,7 +480,7 @@ struct DLNATests {
                         filePath: "http://server/media/vid1/vid1.mp4",
                         mimeType: "video/mp4",
                         fileSize: 50000
-                    )
+                    ),
                 ],
                 baseURL: "http://server"
             )
@@ -486,4 +510,22 @@ struct DLNATests {
             #expect(items.isEmpty)
         }
     }
+
+    // MARK: - Queue labels (#18 review: one reverse-DNS root, spelled once)
+
+    @Suite("NetKit queue labels")
+    struct QueueLabelTests {
+        @Test("every queue label is under OBYW.one's one.obyw.netkit root, and none repeats")
+        func labelsShareTheOBYWRoot() {
+            let labels = NetKitQueueLabel.allCases.map(\.label)
+            #expect(labels.allSatisfy { $0.hasPrefix("one.obyw.netkit.") })
+            #expect(Set(labels).count == labels.count)
+        }
+
+        @Test("a queue made from a case carries that case's label")
+        func queueCarriesItsLabel() {
+            #expect(NetKitQueueLabel.dlnaBrowser.makeQueue().label == "one.obyw.netkit.dlna.browser")
+        }
+    }
 }
+#endif

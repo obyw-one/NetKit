@@ -1,5 +1,7 @@
+#if canImport(Network)
 import Foundation
 import Network
+import os
 
 /// A DLNA/UPnP Media Server that combines SSDP advertising with an HTTP file server.
 ///
@@ -13,32 +15,50 @@ import Network
 /// server.contentDirectory.setItems(mediaItems)
 /// try await server.start()
 /// ```
-public final class DLNAServer: @unchecked Sendable {
+public final class DLNAServer: Sendable {
+    /// What changes after `init`: the Network listener, the SSDP helpers, the
+    /// assigned port and the two callbacks. One value behind one lock, so
+    /// `start()`, `stop()`, `port` and the setters are safe from any thread; the
+    /// listener's callbacks (on `queue`) never call out while holding it.
+    private struct State {
+        var listener: NWListener?
+        var advertiser: SSDPAdvertiser?
+        var searchResponder: SSDPSearchResponder?
+        var port: UInt16 = 0
+        var onReady: (@Sendable (UInt16) -> Void)?
+        var apiHandler: (@Sendable (_ method: String, _ path: String, _ body: Data?) -> (status: String, body: String)?)?
+    }
+
     public let friendlyName: String
     public let uuid: String
     public let contentDirectory = ContentDirectory()
 
-    private let queue = DispatchQueue(label: "net.netkit.dlna.server")
-    private var listener: NWListener?
-    private var advertiser: SSDPAdvertiser?
-    private var searchResponder: SSDPSearchResponder?
-    private var _port: UInt16 = 0
+    private let queue = NetKitQueueLabel.dlnaServer.makeQueue()
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
-    /// Called when the server is ready and the port is assigned.
-    public var onReady: ((UInt16) -> Void)?
+    /// Called when the server is ready and the port is assigned. Called on the
+    /// server's queue, hence `@Sendable`.
+    public var onReady: (@Sendable (UInt16) -> Void)? {
+        get { state.withLock { $0.onReady } }
+        set { state.withLock { $0.onReady = newValue } }
+    }
 
     /// Custom API handler: (method, path, body) → (statusCode, responseBody)?
     /// Return nil to fall through to default routing.
     /// Set BEFORE calling start().
-    public var apiHandler: (@Sendable (_ method: String, _ path: String, _ body: Data?) -> (status: String, body: String)?)?
+    public var apiHandler: (@Sendable (_ method: String, _ path: String, _ body: Data?) -> (status: String, body: String)?)? {
+        get { state.withLock { $0.apiHandler } }
+        set { state.withLock { $0.apiHandler = newValue } }
+    }
 
     /// The port the server is listening on (available after `start()`).
-    public var port: UInt16 { _port }
+    public var port: UInt16 { state.withLock { $0.port } }
 
     /// The base URL for this server (e.g., "http://192.168.1.10:8080").
     public var baseURL: String {
-        guard let address = localIPAddress() else { return "http://localhost:\(_port)" }
-        return "http://\(address):\(_port)"
+        let port = self.port
+        guard let address = localIPAddress() else { return "http://localhost:\(port)" }
+        return "http://\(address):\(port)"
     }
 
     public init(
@@ -57,16 +77,22 @@ public final class DLNAServer: @unchecked Sendable {
         params.allowLocalEndpointReuse = true
 
         let nwListener = try NWListener(using: params, on: .any)
-        self.listener = nwListener
+        let previous = state.withLock { state -> NWListener? in
+            let old = state.listener
+            state.listener = nwListener
+            return old
+        }
+        previous?.cancel()
 
-        nwListener.stateUpdateHandler = { [weak self] state in
+        nwListener.stateUpdateHandler = { [weak self] listenerState in
             guard let self else { return }
-            if case .ready = state {
-                if let port = nwListener.port?.rawValue {
-                    self._port = port
-                    self.startAdvertiser()
-                    self.onReady?(port)
+            if case .ready = listenerState, let port = nwListener.port?.rawValue {
+                let onReady = self.state.withLock { state -> (@Sendable (UInt16) -> Void)? in
+                    state.port = port
+                    return state.onReady
                 }
+                self.startAdvertiser()
+                onReady?(port)
             }
         }
 
@@ -79,12 +105,16 @@ public final class DLNAServer: @unchecked Sendable {
 
     /// Stop the DLNA server and SSDP advertising.
     public func stop() {
+        let (listener, advertiser, responder) = state.withLock { state in
+            let taken = (state.listener, state.advertiser, state.searchResponder)
+            state.listener = nil
+            state.advertiser = nil
+            state.searchResponder = nil
+            return taken
+        }
         advertiser?.stop()
-        advertiser = nil
-        searchResponder?.stop()
-        searchResponder = nil
+        responder?.stop()
         listener?.cancel()
-        listener = nil
     }
 
     // MARK: - SSDP Advertising
@@ -94,12 +124,18 @@ public final class DLNAServer: @unchecked Sendable {
         let usn = "uuid:\(uuid)::\(SSDPConstants.mediaServerType)"
 
         let adv = SSDPAdvertiser(location: location, usn: usn)
-        self.advertiser = adv
-        adv.start()
-
-        // Also start listening for M-SEARCH queries so browsers can discover us
         let responder = SSDPSearchResponder(location: location, usn: usn)
-        self.searchResponder = responder
+        let previous = state.withLock { state -> (SSDPAdvertiser?, SSDPSearchResponder?) in
+            let old = (state.advertiser, state.searchResponder)
+            state.advertiser = adv
+            state.searchResponder = responder
+            return old
+        }
+        previous.0?.stop()
+        previous.1?.stop()
+
+        adv.start()
+        // Also start listening for M-SEARCH queries so browsers can discover us
         responder.start()
     }
 
@@ -137,15 +173,8 @@ public final class DLNAServer: @unchecked Sendable {
 
         let method = String(parts[0])
         let path = String(parts[1])
-
-        // Parse headers
-        var headers: [String: String] = [:]
-        for line in lines.dropFirst() {
-            guard let colonIndex = line.firstIndex(of: ":") else { continue }
-            let key = line[line.startIndex..<colonIndex].trimmingCharacters(in: .whitespaces).lowercased()
-            let value = line[line.index(after: colonIndex)...].trimmingCharacters(in: .whitespaces)
-            headers[key] = value
-        }
+        let headers = Self.parseHeaders(lines.dropFirst())
+        let handler = apiHandler
 
         switch (method, path) {
         case ("GET", "/description.xml"):
@@ -163,28 +192,45 @@ public final class DLNAServer: @unchecked Sendable {
         case ("HEAD", let p) where p.hasPrefix("/media/"):
             handleMediaRequest(path: p, headers: headers, connection: connection, headOnly: true)
 
-        case ("GET", "/api/ping"):
-            sendResponse(connection: connection, status: "200 OK", contentType: "application/json", body: "{\"pong\":true,\"hasApiHandler\":\(apiHandler != nil)}")
-
-        case (let m, let p) where apiHandler != nil:
-            // Custom API handler — parse body from raw HTTP data
-            let separator = Data("\r\n\r\n".utf8)
-            let body: Data?
-            if let range = rawData.firstRange(of: separator) {
-                let bodySlice = rawData[range.upperBound...]
-                body = bodySlice.isEmpty ? nil : Data(bodySlice)
-            } else {
-                body = nil
-            }
-            if let result = apiHandler?(m, p, body) {
-                sendResponse(connection: connection, status: result.status, contentType: "application/json", body: result.body)
-            } else {
-                sendResponse(connection: connection, status: "404 Not Found", body: "Not Found")
-            }
-
         default:
+            routeAPI(method: method, path: path, rawData: rawData, handler: handler, connection: connection)
+        }
+    }
+
+    /// Everything that is not DLNA itself: the ping, the app's own API handler, else 404.
+    private func routeAPI(
+        method: String,
+        path: String,
+        rawData: Data,
+        handler: (@Sendable (_ method: String, _ path: String, _ body: Data?) -> (status: String, body: String)?)?,
+        connection: NWConnection
+    ) {
+        if method == "GET", path == "/api/ping" {
+            sendResponse(connection: connection, status: "200 OK", contentType: "application/json", body: "{\"pong\":true,\"hasApiHandler\":\(handler != nil)}")
+        } else if let result = handler?(method, path, Self.requestBody(in: rawData)) {
+            // Custom API handler — the body is parsed from the raw HTTP data
+            sendResponse(connection: connection, status: result.status, contentType: "application/json", body: result.body)
+        } else {
             sendResponse(connection: connection, status: "404 Not Found", body: "Not Found")
         }
+    }
+
+    private static func parseHeaders(_ lines: ArraySlice<String>) -> [String: String] {
+        var headers: [String: String] = [:]
+        for line in lines {
+            guard let colonIndex = line.firstIndex(of: ":") else { continue }
+            let key = line[line.startIndex..<colonIndex].trimmingCharacters(in: .whitespaces).lowercased()
+            let value = line[line.index(after: colonIndex)...].trimmingCharacters(in: .whitespaces)
+            headers[key] = value
+        }
+        return headers
+    }
+
+    /// The bytes after the blank line that ends the HTTP headers, or nil when there are none.
+    private static func requestBody(in rawData: Data) -> Data? {
+        guard let range = rawData.firstRange(of: Data("\r\n\r\n".utf8)) else { return nil }
+        let bodySlice = rawData[range.upperBound...]
+        return bodySlice.isEmpty ? nil : Data(bodySlice)
     }
 
     // MARK: - Device Description
@@ -268,7 +314,8 @@ public final class DLNAServer: @unchecked Sendable {
         }
 
         guard let jsonData = try? JSONSerialization.data(withJSONObject: json, options: [.sortedKeys]),
-              let jsonString = String(data: jsonData, encoding: .utf8) else {
+              let jsonString = String(data: jsonData, encoding: .utf8)
+        else {
             sendResponse(connection: connection, status: "500 Internal Server Error", body: "JSON Error")
             return
         }
@@ -317,7 +364,8 @@ public final class DLNAServer: @unchecked Sendable {
         let fm = FileManager.default
         guard fm.fileExists(atPath: filePath),
               let attrs = try? fm.attributesOfItem(atPath: filePath),
-              let fileSize = attrs[.size] as? Int64 else {
+              let fileSize = attrs[.size] as? Int64
+        else {
             sendResponse(connection: connection, status: "404 Not Found", body: "File Not Found")
             return
         }
@@ -325,15 +373,9 @@ public final class DLNAServer: @unchecked Sendable {
         let mimeType = filename.hasPrefix("thumbnail") ? "image/jpeg" : item.mimeType
 
         // Parse Range header
+        let target = MediaTarget(filePath: filePath, fileSize: fileSize, mimeType: mimeType)
         if let rangeHeader = headers["range"] {
-            handleRangeRequest(
-                filePath: filePath,
-                fileSize: fileSize,
-                mimeType: mimeType,
-                rangeHeader: rangeHeader,
-                connection: connection,
-                headOnly: headOnly
-            )
+            handleRangeRequest(target, rangeHeader: rangeHeader, connection: connection, headOnly: headOnly)
         } else {
             // Full file response
             let responseHeaders = """
@@ -357,14 +399,15 @@ public final class DLNAServer: @unchecked Sendable {
         }
     }
 
-    private func handleRangeRequest(
-        filePath: String,
-        fileSize: Int64,
-        mimeType: String,
-        rangeHeader: String,
-        connection: NWConnection,
-        headOnly: Bool
-    ) {
+    /// The file a media request resolved to.
+    private struct MediaTarget {
+        let filePath: String
+        let fileSize: Int64
+        let mimeType: String
+    }
+
+    private func handleRangeRequest(_ target: MediaTarget, rangeHeader: String, connection: NWConnection, headOnly: Bool) {
+        let (filePath, fileSize, mimeType) = (target.filePath, target.fileSize, target.mimeType)
         // Parse "bytes=start-end" or "bytes=start-"
         guard rangeHeader.hasPrefix("bytes=") else {
             sendResponse(connection: connection, status: "416 Range Not Satisfiable", body: "Bad Range")
@@ -427,47 +470,39 @@ public final class DLNAServer: @unchecked Sendable {
         }
 
         handle.seek(toFileOffset: UInt64(offset))
-        let chunkSize = 65536
-        // Use a class wrapper so the closure can capture a mutable reference in a Sendable way
-        final class ChunkState: @unchecked Sendable {
-            var remaining: Int
-            let handle: FileHandle
-            init(remaining: Int, handle: FileHandle) {
-                self.remaining = remaining
-                self.handle = handle
-            }
-        }
-        let state = ChunkState(remaining: length, handle: handle)
+        Self.sendChunk(from: handle, remaining: length, on: connection)
+    }
 
-        @Sendable func sendChunk() {
-            let toRead = min(chunkSize, state.remaining)
-            guard toRead > 0 else {
-                try? state.handle.close()
-                connection.cancel()
-                return
-            }
-
-            let data = state.handle.readData(ofLength: toRead)
-            guard !data.isEmpty else {
-                try? state.handle.close()
-                connection.cancel()
-                return
-            }
-
-            state.remaining -= data.count
-            let isLast = state.remaining <= 0
-
-            connection.send(content: data, isComplete: isLast, completion: .contentProcessed { error in
-                if error != nil || isLast {
-                    try? state.handle.close()
-                    if isLast { connection.cancel() }
-                } else {
-                    sendChunk()
-                }
-            })
+    /// Send the next 64 KiB and, once the connection has taken it, the one after.
+    /// The count still to send travels BY VALUE in the completion handler, so no
+    /// shared mutable state exists to guard: each chunk's handler is the only
+    /// owner of "what is left".
+    private static func sendChunk(from handle: FileHandle, remaining: Int, on connection: NWConnection) {
+        let toRead = min(65536, remaining)
+        guard toRead > 0 else {
+            try? handle.close()
+            connection.cancel()
+            return
         }
 
-        sendChunk()
+        let data = handle.readData(ofLength: toRead)
+        guard !data.isEmpty else {
+            try? handle.close()
+            connection.cancel()
+            return
+        }
+
+        let left = remaining - data.count
+        let isLast = left <= 0
+
+        connection.send(content: data, isComplete: isLast, completion: .contentProcessed { error in
+            if error != nil || isLast {
+                try? handle.close()
+                if isLast { connection.cancel() }
+            } else {
+                sendChunk(from: handle, remaining: left, on: connection)
+            }
+        })
     }
 
     // MARK: - HTTP Response
@@ -499,7 +534,8 @@ public final class DLNAServer: @unchecked Sendable {
 
     private func extractXMLValue(from xml: String, tag: String) -> String? {
         guard let startRange = xml.range(of: "<\(tag)>"),
-              let endRange = xml.range(of: "</\(tag)>") else { return nil }
+              let endRange = xml.range(of: "</\(tag)>")
+        else { return nil }
         let valueStart = startRange.upperBound
         let valueEnd = endRange.lowerBound
         guard valueStart < valueEnd else { return nil }
@@ -522,8 +558,7 @@ public final class DLNAServer: @unchecked Sendable {
                     var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
                     let addrLen = socklen_t(addr.ifa_addr.pointee.sa_len)
                     if getnameinfo(addr.ifa_addr, addrLen, &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST) == 0 {
-                        let nullIndex = hostname.firstIndex(of: 0) ?? hostname.endIndex
-                        result = String(decoding: hostname[hostname.startIndex..<nullIndex].map { UInt8(bitPattern: $0) }, as: UTF8.self)
+                        result = hostname.withUnsafeBufferPointer { buffer in buffer.baseAddress.flatMap { String(validatingCString: $0) } }
                         break
                     }
                 }
@@ -533,3 +568,4 @@ public final class DLNAServer: @unchecked Sendable {
         return result
     }
 }
+#endif

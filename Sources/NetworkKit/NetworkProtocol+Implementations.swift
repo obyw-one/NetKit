@@ -5,14 +5,15 @@
 //  Extracted from WabiSabi — Created by Jeoffrey Thirot on 12/02/2024.
 //
 
-import Combine
 import CoreKit
 import Foundation
-import os
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public extension NetworkProtocol {
     func sendRequest<T: Decodable & Sendable>(endpoint: EndPoint) async throws -> T {
-        let urlRequest = createRequest(endPoint: endpoint)
+        let urlRequest = try createRequest(endPoint: endpoint)
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -23,7 +24,7 @@ public extension NetworkProtocol {
         }
 
         AppLog.network.debug("Request success: \(httpResponse.url?.debugDescription ?? "[no url]")")
-        AppLog.network.debug("Response data: \(data.prettyJson ?? "[Json invalid]")")
+        AppLog.network.debug("Response data: \((try? data.prettyJSON()) ?? "[Json invalid]")")
 
         do {
             let decoder = JSONDecoder()
@@ -36,34 +37,14 @@ public extension NetworkProtocol {
         }
     }
 
-    func sendRequest<T>(endpoint: EndPoint, type: T.Type) -> AnyPublisher<T, NetworkError> where T: Decodable {
-        let urlRequest = createRequest(endPoint: endpoint)
-        return URLSession.shared.dataTaskPublisher(for: urlRequest)
-            .subscribe(on: DispatchQueue.global(qos: .background))
-            .tryMap { data, response -> Data in
-                guard let response = response as? HTTPURLResponse else {
-                    throw NetworkError.requestFailed(description: "Unexpected HTTP answer")
-                }
-                guard 200..<400 ~= response.statusCode else {
-                    throw NetworkError.unexpectedStatusCode(response.statusCode)
-                }
-                return data
-            }
-            .decode(type: T.self, decoder: JSONDecoder())
-            .mapError { error -> NetworkError in
-                if let error = error as? DecodingError {
-                    return .jsonParsingFailed(error)
-                } else if let error = error as? NetworkError {
-                    return error
-                } else {
-                    return .unknown(error)
-                }
-            }
-            .eraseToAnyPublisher()
-    }
-
     func sendRequest<T: Decodable & Sendable>(endpoint: EndPoint, resultHandler: @escaping @Sendable (Result<T, NetworkError>) -> Void) {
-        let urlRequest = createRequest(endPoint: endpoint)
+        let urlRequest: URLRequest
+        do {
+            urlRequest = try createRequest(endPoint: endpoint)
+        } catch {
+            resultHandler(.failure(error))
+            return
+        }
         let urlTask = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
             if let error {
                 resultHandler(.failure(.unknown(error)))

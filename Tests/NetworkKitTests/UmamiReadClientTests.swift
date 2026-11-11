@@ -12,6 +12,10 @@ import Testing
 
 @testable import NetKit
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking  // URLRequest on Linux
+#endif
+
 @Suite("UmamiReadClient")
 struct UmamiReadClientTests {
 

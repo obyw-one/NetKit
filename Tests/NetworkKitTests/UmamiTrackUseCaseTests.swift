@@ -9,8 +9,10 @@
 
 import Foundation
 import Testing
-
 @testable import NetKit
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Suite("UmamiTrackUseCase")
 struct UmamiTrackUseCaseTests {
@@ -18,8 +20,8 @@ struct UmamiTrackUseCaseTests {
   private struct StubTrackInfo: TrackInfoProtocol {
     var url: String = "/cli"
     var title: String = "shikki.verb.exit"
-    var referrer: String? = nil
-    var tag: String? = nil
+    var referrer: String?
+    var tag: String?
     var extra: [String: String] = [:]
   }
 
