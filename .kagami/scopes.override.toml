@@ -16,9 +16,9 @@ language = "swift"
 package_path = "."
 test_target_name = "NetKitTests"
 module_patterns = ["NetKitTests"]
-type_patterns = ["ContentDirectoryTests", "DIDLLiteTests", "DIDLParsingTests", "DLNATests", "DeviceDescriptionTests", "EndPointTests", "MediaItemTests", "MockNetworkServiceTests", "NetworkServiceTests", "SOAPTests", "SSDPParsingTests", "SSDPSearchResponderTests", "SSDPSerializationTests", "SidecarMetadataTests", "UmamiAnswerTests", "UmamiAnswerAcceptanceTests", "UmamiEndPointTests", "UmamiEndPointNameTests", "UmamiTrackUseCaseTests", "UmamiReadClientTests", "URLSessionS3TransportTests"]
+type_patterns = ["ContentDirectoryTests", "DIDLLiteTests", "DIDLParsingTests", "DLNATests", "DeviceDescriptionTests", "EndPointTests", "MediaItemTests", "MockNetworkServiceTests", "NetworkServiceTests", "NetworkServiceDecoderTests", "SOAPTests", "SSDPParsingTests", "SSDPSearchResponderTests", "SSDPSerializationTests", "SidecarMetadataTests", "UmamiAnswerTests", "UmamiAnswerAcceptanceTests", "UmamiEndPointTests", "UmamiEndPointNameTests", "UmamiTrackUseCaseTests", "UmamiReadClientTests", "URLSessionS3TransportTests"]
 test_file_patterns = ["**/NetworkKitTests/DLNATests.swift", "**/NetworkKitTests/EndPointTests.swift", "**/NetworkKitTests/MockNetworkServiceTests.swift", "**/NetworkKitTests/NetworkServiceTests.swift", "**/NetworkKitTests/UmamiAnswerTests.swift", "**/NetworkKitTests/UmamiEndPointTests.swift", "**/NetworkKitTests/UmamiTrackUseCaseTests.swift", "**/NetworkKitTests/UmamiReadClientTests.swift", "**/NetworkKitTests/ObjectStore/URLSessionS3TransportTests.swift"]
-expected_test_min = 117
+expected_test_min = 121
 timeout_seconds = 600
 description = "NetKit — the umami wire contract (config validation, endpoint body, UmamiAnswer acceptance) plus DLNA/SSDP and the NetworkService seam."
 

@@ -5,6 +5,22 @@ All notable changes to NetKit are documented here. This project follows
 
 ## [Unreleased]
 
+## [3.1.0] — unreleased
+
+### Added
+
+- **`NetworkService(decoder:)` and `NetworkService(decoderFactory:)` — the
+  injectable decoder is back, additively.** 2.1.0 let a caller hand `NetworkService`
+  a `JSONDecoder`; 2.4.0 dropped it and 3.0.0 decoded with a fixed PocketBase date
+  strategy only. A consumer that decodes a snake_case API (fuzzy-swift's
+  `.convertFromSnakeCase`) had no way left to say so. `NetworkService()` is
+  unchanged. `JSONDecoder` is not `Sendable`, so `init(decoder:)` keeps a snapshot
+  of its key, date, data and non-conforming-float strategies and builds a fresh
+  decoder per request (`userInfo` is not carried; use `init(decoderFactory:)`).
+- **`NetworkProtocol.injectedDecoder() -> JSONDecoder?`**, a requirement with a
+  default of `nil`: existing conformers compile and behave as before. The `async`,
+  closure and (in `NetKitApple`) Combine forms of `sendRequest` use it when set.
+
 ## [3.0.0] — 2026-11-11
 
 One release for the four PRs merged since 2.4.0: the PocketBase client and config
