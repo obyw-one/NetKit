@@ -26,9 +26,20 @@ public extension NetworkProtocol {
         AppLog.network.debug("Request success: \(httpResponse.url?.debugDescription ?? "[no url]")")
         AppLog.network.debug("Response data: \((try? data.prettyJSON()) ?? "[Json invalid]")")
 
+        return try decodeResponse(data)
+    }
+
+    /// The decode step of the `async` `sendRequest`: the injected decoder when there is one,
+    /// otherwise the PocketBase date strategy.
+    internal func decodeResponse<T: Decodable>(_ data: Data) throws -> T {
         do {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .custom(decoder.pocketbaseDateDecodingStrategy())
+            let decoder: JSONDecoder
+            if let injected = injectedDecoder() {
+                decoder = injected
+            } else {
+                decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .custom(decoder.pocketbaseDateDecodingStrategy())
+            }
             return try decoder.decode(T.self, from: data)
         } catch let error as DecodingError {
             throw NetworkError.jsonParsingFailed(error)
@@ -64,7 +75,7 @@ public extension NetworkProtocol {
             }
 
             do {
-                let decodedResponse = try JSONDecoder().decode(T.self, from: data)
+                let decodedResponse = try (injectedDecoder() ?? JSONDecoder()).decode(T.self, from: data)
                 resultHandler(.success(decodedResponse))
             } catch let error as DecodingError {
                 resultHandler(.failure(NetworkError.jsonParsingFailed(error)))

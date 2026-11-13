@@ -34,7 +34,7 @@ public extension NetworkProtocol {
                 }
                 return data
             }
-            .decode(type: T.self, decoder: JSONDecoder())
+            .decode(type: T.self, decoder: injectedDecoder() ?? JSONDecoder())
             .mapError { error -> NetworkError in
                 if let error = error as? DecodingError {
                     return .jsonParsingFailed(error)

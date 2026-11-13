@@ -57,3 +57,45 @@ struct NetworkServiceTests {
         #expect(names.contains("filter[status]"))
     }
 }
+
+@Suite("NetworkService injectable decoder")
+struct NetworkServiceDecoderTests {
+    private struct Row: Decodable, Equatable { let firstName: String }
+
+    @Test("a snake_case decoder is used for the response")
+    func customDecoderIsUsed() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let service = NetworkService(decoder: decoder)
+        let row: Row = try service.decodeResponse(Data(#"{"first_name":"Ada"}"#.utf8))
+        #expect(row == Row(firstName: "Ada"))
+    }
+
+    @Test("a decoderFactory is used for the response")
+    func factoryIsUsed() throws {
+        let service = NetworkService(decoderFactory: {
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            return decoder
+        })
+        let row: Row = try service.decodeResponse(Data(#"{"first_name":"Ada"}"#.utf8))
+        #expect(row == Row(firstName: "Ada"))
+    }
+
+    @Test("the default service is unchanged: snake_case keys do not map")
+    func defaultUnchanged() {
+        let service = NetworkService()
+        #expect(service.injectedDecoder() == nil)
+        #expect(throws: NetworkError.self) {
+            let _: Row = try service.decodeResponse(Data(#"{"first_name":"Ada"}"#.utf8))
+        }
+        #expect(throws: Never.self) {
+            let _: Row = try service.decodeResponse(Data(#"{"firstName":"Ada"}"#.utf8))
+        }
+    }
+
+    @Test("a mock conformer keeps the nil default")
+    func mockDefault() {
+        #expect(MockNetworkService().injectedDecoder() == nil)
+    }
+}

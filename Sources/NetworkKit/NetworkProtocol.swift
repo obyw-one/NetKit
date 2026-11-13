@@ -26,9 +26,17 @@ public protocol NetworkProtocol: Sendable {
 
     func sendRequest<T: Decodable & Sendable>(endpoint: EndPoint) async throws -> T
     func sendRequest<T: Decodable>(endpoint: EndPoint, resultHandler: @escaping @Sendable (Result<T, NetworkError>) -> Void)
+
+    /// The decoder the conformer wants every response decoded with, or `nil` for the built-in
+    /// behaviour (the PocketBase date strategy for the `async` form, a plain `JSONDecoder` for
+    /// the closure and publisher forms). Has a default (`nil`), so existing conformers are
+    /// unaffected; ``NetworkService`` overrides it from `init(decoder:)`.
+    func injectedDecoder() -> JSONDecoder?
 }
 
 public extension NetworkProtocol {
+    func injectedDecoder() -> JSONDecoder? { nil }
+
     func createRequest(endPoint: EndPoint) throws(NetworkError) -> URLRequest {
         var urlComponents = URLComponents()
         urlComponents.scheme = endPoint.scheme
