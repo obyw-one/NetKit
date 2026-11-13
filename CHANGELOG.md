@@ -5,7 +5,7 @@ All notable changes to NetKit are documented here. This project follows
 
 ## [Unreleased]
 
-## [3.1.0] — unreleased
+## [3.1.0] — 2026-11-13
 
 ### Added
 
