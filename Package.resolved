@@ -1,13 +1,13 @@
 {
-  "originHash" : "c030c8e7fbc77dd6f6b05c17eba380413d9009499ecbb6bdef43beaa9eb36fae",
+  "originHash" : "571b72d4290c5913f981c5a3570bfad3bb6c20af8dba5ff058553fef8f599848",
   "pins" : [
     {
       "identity" : "corekit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/obyw-one/CoreKit.git",
       "state" : {
-        "revision" : "5e635506d4b7a83786cce95ba1618f5d5740d8df",
-        "version" : "0.16.0"
+        "revision" : "1a915c76ede43d88f31caf116e6a2ea6fdc56f98",
+        "version" : "0.17.0"
       }
     },
     {

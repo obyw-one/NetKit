@@ -2,6 +2,19 @@
 //  LockedState.swift
 //  NetKit
 //
+//  Spec c8fa126c BR-L-03: `Sources/NetworkKit/Platform/` is the ONE subtree in
+//  the portable NetKit target where a platform condition may appear, mirroring
+//  `Sources/CoreKit/Platform/`. The T-L-03/T-L-04 ratchet
+//  (`NetKitPortabilityRatchetTests`) excludes it BY PATH, never by filename
+//  ([[a-ratchet-scopes-a-folder-subtree-never-a-filename-list]]).
+//
+//  The condition here selects a LOCK PRIMITIVE, not a capability: both arms are
+//  compiler-checked `Sendable` and neither is `@unchecked`, so the fleet rule
+//  that turns a lock box into an actor does not apply
+//  ([[unchecked-sendable-on-a-recorder-is-a-symptom-make-the-callback-async]]).
+//  What DID apply was its location: a condition in the middle of the portable
+//  tree is how a second one arrives unnoticed.
+//
 //  Mutable state behind a lock, `Sendable` BY CONSTRUCTION.
 //
 //  A class that holds mutable fields and a hand-rolled `NSLock` can only claim

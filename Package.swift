@@ -48,7 +48,7 @@ let package = Package(
         // is where `S3Transport` itself appeared. Canonical org is obyw-one;
         // `FJ-Studios/CoreKit` only resolved through GitHub's transfer redirect.
         // ConfigEndpoint and its conformance suite (used by PocketConfigEndpoint) shipped in 0.14.0.
-        .package(url: "https://github.com/obyw-one/CoreKit.git", from: "0.16.0"),
+        .package(url: "https://github.com/obyw-one/CoreKit.git", from: "0.17.0"),
     ],
     targets: [
         .target(

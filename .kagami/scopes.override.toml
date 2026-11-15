@@ -66,3 +66,21 @@ test_file_patterns = ["**/NetworkKitTests/Bonjour/BonjourTXTRecordTests.swift", 
 test_target_name = "NetKitTests"
 timeout_seconds = 300
 type_patterns = ["BonjourTXTRecordTests", "MDNSAdvertiserTests", "MDNSBrowserTests"]
+
+[[scopes]]
+# Spec c8fa126c W4 — T-L-03 / T-L-04 over the portable NetKit target. A cross
+# build cannot see a GUARDED Apple import (the compiler takes the other arm), so
+# `LockedState.swift` carried `#if canImport(os)` + `import os` in the middle of
+# the portable tree for two releases, correctly and invisibly. This scope is the
+# ratchet that binds every later wave of this branch
+# ([[a-wave-that-adds-a-ratchet-binds-every-later-wave]]).
+name = "NetKitPortability"
+language = "swift"
+package_path = "."
+test_target_name = "NetKitTests"
+module_patterns = ["NetKitTests"]
+type_patterns = ["NetKitPortabilityRatchetTests"]
+test_file_patterns = ["**/NetworkKitTests/Portability/*.swift"]
+expected_test_min = 5
+timeout_seconds = 300
+description = "No Apple-only import and no Apple-capability condition in Sources/NetworkKit outside Platform/; no second InterfaceType vocabulary. Run: kagami test --scope NetKitPortability"
