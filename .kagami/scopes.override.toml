@@ -45,3 +45,24 @@ test_file_patterns = ["**/NetworkKitTests/PocketLive/*.swift"]
 expected_test_min = 23
 timeout_seconds = 900
 description = "NetKit PocketClient against a REAL throwaway PocketBase (podman). Run it as `scripts/pocketbase-live.sh -- kagami test --scope NetKitPocketLiveTests --strict`. Without the script the tests FAIL by design (they never skip: kagami counts skipped rows toward the floor and exits 0 on an all-skipped scope)."
+
+[[scopes]]
+# The Bonjour/mDNS suites that arrived with the main->develop reconciliation.
+# Registered as their OWN scope rather than folded into NetKitTests because the
+# code is Apple-only (Sources/NetKitApple/Bonjour: `import Network`, `import os`)
+# and must not be read as portable coverage: a green NetKitTests should keep
+# meaning "the portable target is green".
+#
+# They were ORPHANS when they landed — no scope's type_patterns matched them, so
+# `swift test` ran them and no gate ever reported them. That is the silent-success
+# shape the fleet rules name: the tests pass and the evidence does not exist.
+description = "NetKit — Bonjour/mDNS browse + advertise + TXT record parsing (Apple-only, Sources/NetKitApple/Bonjour). Run: kagami test --scope NetKitBonjour"
+expected_test_min = 22
+language = "swift"
+module_patterns = ["NetKitTests"]
+name = "NetKitBonjour"
+package_path = "."
+test_file_patterns = ["**/NetworkKitTests/Bonjour/BonjourTXTRecordTests.swift", "**/NetworkKitTests/Bonjour/MDNSAdvertiserTests.swift", "**/NetworkKitTests/Bonjour/MDNSBrowserTests.swift"]
+test_target_name = "NetKitTests"
+timeout_seconds = 300
+type_patterns = ["BonjourTXTRecordTests", "MDNSAdvertiserTests", "MDNSBrowserTests"]
